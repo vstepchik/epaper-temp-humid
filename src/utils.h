@@ -6,4 +6,4 @@
 #include "common_types.h"
 
 float celsiusTo(const float celsius, const DegreesUnit unit);
-void formatSize(unsigned long bytes, char* result, int resultSize);
+void formatSize(uint64_t bytes, char* result, uint8_t resultSize);

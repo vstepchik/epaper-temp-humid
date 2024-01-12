@@ -10,9 +10,9 @@ float celsiusTo(const float celsius, const DegreesUnit unit) {
     return NAN;
 }
 
-void formatSize(unsigned long bytes, char* result, int resultSize) {
-    const char* suffixes = "KMGT";
-    int suffixIndex = 0;
+void formatSize(uint64_t bytes, char* result, uint8_t resultSize) {
+    const char* suffixes = " KMGT";
+    uint8_t suffixIndex = 0;
     double size = bytes;
 
     while (size >= 1024 && suffixIndex < 4) {
@@ -23,12 +23,10 @@ void formatSize(unsigned long bytes, char* result, int resultSize) {
     if (suffixIndex == 0) {
         snprintf(result, resultSize, "%lu", (unsigned long)size);
     } else if (size >= 100) {
-        snprintf(result, resultSize, "%lu%s", (unsigned long)size, suffixes + suffixIndex - 1);
+        snprintf(result, resultSize, "%lu%cb", (unsigned long)size, suffixes[suffixIndex]);
     } else if (size >= 10) {
-        snprintf(result, resultSize, "%.1f%s", size, suffixes + suffixIndex - 1);
+        snprintf(result, resultSize, "%.1f%cb", size, suffixes[suffixIndex]);
     } else {
-        snprintf(result, resultSize, "%.2f%s", size, suffixes + suffixIndex - 1);
+        snprintf(result, resultSize, "%.2f%cb", size, suffixes[suffixIndex]);
     }
 }
-
-// 982273581056

@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <cstdint>
 #include <esp32-hal-timer.h>
 #include <ace_button/AceButton.h>
 #include <Adafruit_Si7021.h>
@@ -82,8 +83,8 @@ void loop() {
     displayPayload.currentHumidity = sensor.readHumidity();
     displayPayload.humidityAlert = calcHumidityAlert(displayPayload.currentHumidity);
     displayPayload.batteryLevel = batteryAdcToFullness(analogRead(BATTERY_ADC_PIN));
-    displayPayload.sdCardVolumeBytes = 98227358105L;
-    displayPayload.sdCardOccupiedBytes = 56231604L;
+    displayPayload.sdCardVolumeBytes = (uint64_t) 1000 * 1000 * 1000 * 32;
+    displayPayload.sdCardOccupiedBytes = (uint64_t) 1024 * 1024 * 2 * displayPayload.currentTemperatureCelsius;
 
     displayPayload.statsT1D = {
       .average = displayPayload.currentTemperatureCelsius,

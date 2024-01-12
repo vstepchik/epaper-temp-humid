@@ -106,8 +106,6 @@ void DisplayController::full_repaint(DisplayRenderPayload* data) {
         display.setFont(&Font_04b03b);
         display.setCursor(0, y04b);
         display.print(ET);
-        display.setCursor(238, y04b*2+1);
-        display.print(data->batteryLevel * (float)100, 0);
     } while (display.nextPage());
     display.hibernate();
 }
@@ -183,7 +181,7 @@ void DisplayController::drawStatusBar(DisplayRenderPayload* data) {
     if (data->sdCardVolumeBytes > 0) {
         display.drawInvertedBitmap(87, 0, bmp_sd_card_icon, 4, 5, GxEPD_BLACK);
         display.setFont(&Font_04b03b);
-        char occupiedBuf[5], volumeBuf[5], buf[12];
+        char occupiedBuf[7], volumeBuf[7], buf[sizeof(occupiedBuf) + sizeof(volumeBuf)];
         formatSize(data->sdCardOccupiedBytes, occupiedBuf, sizeof(occupiedBuf));
         formatSize(data->sdCardVolumeBytes, volumeBuf, sizeof(volumeBuf));
         snprintf(buf, sizeof(buf), "%s/%s", occupiedBuf, volumeBuf);
@@ -202,6 +200,10 @@ void DisplayController::drawStatusBar(DisplayRenderPayload* data) {
     int8_t bat_pixels_empty = (1.0 - data->batteryLevel) * 11;
     display.fillRect(248-bat_pixels_empty, 1, bat_pixels_empty, 3, GxEPD_WHITE);
     if (bat_pixels_empty > 0) display.drawPixel(247-bat_pixels_empty, 1, GxEPD_BLACK);
+
+    display.setFont(&tiniest_num42);
+    display.setCursor(242, 10);
+    display.print(data->batteryLevel * (float)100, 0);
 }
 
 void DisplayController::drawCurrentValues(DisplayRenderPayload* data, const float currentTemp, const char unitSymbol) {
