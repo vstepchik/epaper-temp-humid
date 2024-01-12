@@ -1,10 +1,11 @@
-#include "Arduino.h"
-#include "ace_button/AceButton.h"
-#include "DisplayController.h"
+#include <Arduino.h>
+#include <esp32-hal-timer.h>
+#include <ace_button/AceButton.h>
+#include <Adafruit_Si7021.h>
+
+#include "display_controller.h"
 #include "common_types.h"
 #include "settings.h"
-#include <esp32-hal-timer.h>
-#include "Adafruit_Si7021.h"
 
 using namespace ace_button;
 

@@ -1,5 +1,4 @@
 #pragma once
-// device settings go here
 
 // Pins
 #define LED_BUILTIN 19
@@ -7,6 +6,10 @@
 #define ONBOARD_BUTTON_PIN 39
 
 // Constants
+#define DAY_PER_MONTH 30
+#define HOUR_PER_DAY 24
+#define MIN_PER_HOUR 60
+#define SEC_PER_MIN 60
 #define BATT_EMPTY 1828 // value at 3.2V
 /*
 3.20v = 1828
@@ -59,6 +62,4 @@ T-1m..T-1y = 336d/48px   = 7d/px  = 8 bytes * 48px = 384 bytes
 
 
 // Computed
-#define MIN_PER_HOUR 60
-#define SEC_PER_MIN 60
 #define READS_BUFFER_SIZE MIN_PER_HOUR/PX_PER_1H*SEC_PER_MIN/SENSOR_READ_INTERVAL_SEC // 10 reads buffer

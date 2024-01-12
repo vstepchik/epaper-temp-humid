@@ -1,5 +1,4 @@
-#include "Utils.h"
-#include <cmath>
+#include "utils.h"
 
 float celsiusTo(const float celsius, const DegreesUnit unit) {
     switch (unit) {

@@ -1,12 +1,19 @@
 #pragma once
 
 #include <cstdint>
+#include <sys/types.h>
+
 enum DegreesUnit {
     CELSIUS, FARENHEIT,
 };
 
 enum AlertLevel {
     ALERT_NONE, ALERT_WARNING, ALERT_DANGER,
+};
+
+struct SensorReading {
+    float tempCelsius;
+    float humidity;
 };
 
 struct MeasurementStatistics {

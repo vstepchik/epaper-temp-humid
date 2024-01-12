@@ -1,15 +1,5 @@
 #include "Arduino.h"
-#include "DisplayController.h"
-#include "Fonts/TomThumb.h"
-#include "GxEPD2.h"
-#include "Utils.h"
-#include "common_types.h"
-#include "fnt_04b03b.h"
-#include "tiniest_num42.h"
-#include "fnt_big_digits.h"
-#include <cstdint>
-#include <sys/types.h>
-#include "bitmaps.h"
+#include "display_controller.h"
 
 unsigned long ET = 0;
 const char y04b = Font_04b03b.yAdvance / 2 + 1;
@@ -99,12 +89,14 @@ void DisplayController::full_repaint(DisplayRenderPayload* data) {
         display.print(F("MONTH"));
 
         // stats
-        drawStats(154, 28, data->statsT1D); // todo: conversion to kelvins
-        drawStats(186, 28, data->statsT1W);
-        drawStats(218, 28, data->statsT1M);
-        drawStats(154, 42, data->statsH1D);
-        drawStats(186, 42, data->statsH1W);
-        drawStats(218, 42, data->statsH1M);
+        auto tempConversion = [&data](float input) -> float { return celsiusTo(input, data->degreesUnit); };
+        auto humConversion = [](float input) -> float { return input; };
+        drawStats(154, 28, data->statsT1D, tempConversion); // todo: conversion to kelvins
+        drawStats(186, 28, data->statsT1W, tempConversion);
+        drawStats(218, 28, data->statsT1M, tempConversion);
+        drawStats(154, 42, data->statsH1D, humConversion);
+        drawStats(186, 42, data->statsH1W, humConversion);
+        drawStats(218, 42, data->statsH1M, humConversion);
 
         drawHistoryGraph(data, unitSymbol);
 
@@ -169,20 +161,21 @@ void DisplayController::drawGauges(
     display.fillRect(103, 37, 2, 16, GxEPD_WHITE); display.drawFastVLine(102, 37, 16, GxEPD_BLACK);
 }
 
-void DisplayController::drawStats(unsigned char x, unsigned char y, MeasurementStatistics stats) {
+template<typename StatsConversion>
+void DisplayController::drawStats(unsigned char x, unsigned char y, MeasurementStatistics stats, StatsConversion conversion) {
     display.setFont(&TomThumb);
     const unsigned char adv = TomThumb.yAdvance;
     display.setCursor(x + 1, y + adv);
-    display.print(stats.average, 1);
+    display.print(conversion(stats.average), 1);
 
     display.setCursor(x + 1, y + adv + 6);
-    display.print(stats.median, 1);
+    display.print(conversion(stats.median), 1);
 
     display.setCursor(x + 17, y + adv);
-    display.print(stats.max, 1);
+    display.print(conversion(stats.max), 1);
 
     display.setCursor(x + 17, y + adv + 6);
-    display.print(stats.min, 1);
+    display.print(conversion(stats.min), 1);
 }
 
 void DisplayController::drawStatusBar(DisplayRenderPayload* data) {

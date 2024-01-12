@@ -1,9 +1,11 @@
 #pragma once
 
-#include "Arduino.h"
+#include <Arduino.h>
+#include <GxEPD2.h>
 #include <GxEPD2_BW.h>
 #include "common_types.h"
-#include "Utils.h"
+#include "utils.h"
+#include "bitmaps.h"
 
 #include "fnt_04b03b.h"
 #include "tiniest_num42.h"
@@ -21,6 +23,7 @@ private:
   void drawStatusBar(DisplayRenderPayload* data);
   void drawGauges(DegreesUnit tempUnit, float tempMiddlePointCelsius, float humidityMiddlePointValue, float currentTempConverted, float currentHumidity);
   void drawCurrentValues(DisplayRenderPayload* data, const float currentTemp, const char unitSymbol);
-  void drawStats(unsigned char x, unsigned char y, MeasurementStatistics stats);
+  template<typename StatsConversion>
+  void drawStats(unsigned char x, unsigned char y, MeasurementStatistics stats, StatsConversion conversion);
   void drawHistoryGraph(DisplayRenderPayload* data, const char unitSymbol);
 };

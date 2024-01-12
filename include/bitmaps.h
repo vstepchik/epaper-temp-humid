@@ -1,4 +1,5 @@
 #pragma once
+
 #include <Adafruit_GFX.h>
 
 // 'arrow_bold_dn', 7x8px
@@ -86,23 +87,4 @@ const unsigned char bmp_warning [] PROGMEM = {
 // 't_icon', 5x8px
 const unsigned char bmp_t_icon [] PROGMEM = {
 	0x90, 0x98, 0x90, 0x98, 0x90, 0x48, 0x08, 0x98
-};
-
-// Array of all bitmaps for convenience. (Total bytes used to store images in PROGMEM = 928)
-const int bmp_allArray_LEN = 14;
-const unsigned char* bmp_allArray[14] = {
-	bmp_arrow_bold_dn,
-	bmp_arrow_bold_up,
-	bmp_arrow_thin_dn,
-	bmp_arrow_thin_up,
-	bmp_bat_full,
-	bmp_danger,
-	bmp_gauge_h_bg,
-	bmp_gauge_t_bg,
-	bmp_h_icon,
-	bmp_no_sd_card,
-	bmp_sd_card_icon,
-	bmp_stats_hint,
-	bmp_t_icon,
-	bmp_warning
 };
