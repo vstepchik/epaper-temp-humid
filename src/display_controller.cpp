@@ -10,11 +10,21 @@ DisplayController::DisplayController() : display(GxEPD2_213_B74(5, 17, 16, 4)) {
     display.setFullWindow();
     display.setTextColor(GxEPD_BLACK);
     display.setTextWrap(false);
+
+    // delay(5);
+    // display.firstPage();
+    // do {
+    //     display.fillScreen(GxEPD_WHITE);
+    //     display.drawLine(0, 0, display.width(), display.height(), GxEPD_BLACK);
+    //     display.drawLine(display.width(), 0, 0, display.height(), GxEPD_BLACK);
+    // } while (display.nextPage());
+    // display.hibernate();
 }
 
 void DisplayController::debug_print(char* txt) {
     unsigned long T1 = 0, T2 = 0;
     
+    display.setFullWindow();
     display.firstPage();
     do {
         T1 = micros();
@@ -42,6 +52,8 @@ void DisplayController::full_repaint(DisplayRenderPayload* data) {
     int16_t tbx, tby; uint16_t tbw, tbh;
     char buf[5];
     
+    display.setFullWindow();
+    // display.setPartialWindow(1, 1, 100, 100);
     display.firstPage();
     do {
         T1 = micros();
@@ -179,21 +191,23 @@ void DisplayController::drawStats(unsigned char x, unsigned char y, MeasurementS
 void DisplayController::drawStatusBar(DisplayRenderPayload* data) {
     // sd card
     if (data->sdCardVolumeBytes > 0) {
-        display.drawInvertedBitmap(87, 0, bmp_sd_card_icon, 4, 5, GxEPD_BLACK);
+        display.drawInvertedBitmap(67, 0, bmp_sd_card_icon, 4, 5, GxEPD_BLACK);
         display.setFont(&Font_04b03b);
         char occupiedBuf[7], volumeBuf[7], buf[sizeof(occupiedBuf) + sizeof(volumeBuf)];
         formatSize(data->sdCardOccupiedBytes, occupiedBuf, sizeof(occupiedBuf));
         formatSize(data->sdCardVolumeBytes, volumeBuf, sizeof(volumeBuf));
         snprintf(buf, sizeof(buf), "%s/%s", occupiedBuf, volumeBuf);
         // display.getTextBounds(buf, 0, 0, &tbx, &tby, &tbw, &tbh);
-        display.setCursor(92, y04b);
+        display.setCursor(72, y04b);
         display.print(buf);
     }
 
     // time
     display.setFont(&Font_04b03b);
-    display.setCursor(162, y04b);
-    display.print("2024-01-12 01:23");
+    char buf[19];
+    strftime(buf, sizeof(buf), "%Y-%m-%d - %H:%M", &data->timeinfo);
+    display.setCursor(152, y04b);
+    display.print(buf);
 
     // battery
     display.drawInvertedBitmap(236, 0, bmp_bat_full, 14, 5, GxEPD_BLACK);
@@ -204,6 +218,21 @@ void DisplayController::drawStatusBar(DisplayRenderPayload* data) {
     display.setFont(&tiniest_num42);
     display.setCursor(242, 10);
     display.print(data->batteryLevel * (float)100, 0);
+}
+
+void DisplayController::paint_time(tm* timeinfo) {
+    display.setFont(&Font_04b03b);
+    char buf[19];
+    strftime(buf, sizeof(buf), "%Y-%m-%d - %H:%M", timeinfo);
+    int16_t tbx, tby; uint16_t tbw, tbh;
+    display.getTextBounds(buf, 0, 0, &tbx, &tby, &tbw, &tbh);
+    display.setPartialWindow(152, 0, tbw, tbh);
+    display.firstPage();
+    do {
+        display.fillRect(0, 0, tbw, tbh, GxEPD_WHITE);
+        display.setCursor(0, y04b);
+        display.print(buf);
+    } while (display.nextPage());
 }
 
 void DisplayController::drawCurrentValues(DisplayRenderPayload* data, const float currentTemp, const char unitSymbol) {

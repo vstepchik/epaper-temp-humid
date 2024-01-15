@@ -1,15 +1,18 @@
 #pragma once
 
 // Pins
-#define LED_BUILTIN 19
-#define BATTERY_ADC_PIN 35
-#define ONBOARD_BUTTON_PIN 39
+#define LED_BUILTIN GPIO_NUM_19
+#define BATTERY_ADC_PIN GPIO_NUM_35
+#define ONBOARD_BUTTON_PIN GPIO_NUM_39
 
 // Constants
 #define DAY_PER_MONTH 30
 #define HOUR_PER_DAY 24
 #define MIN_PER_HOUR 60
 #define SEC_PER_MIN 60
+#define MICROSECONDS_PER_SECOND 1000000
+#define MICROSECONDS_PER_MILLISECOND 1000
+
 #define BATT_EMPTY 1828 // value at 3.2V
 /*
 3.20v = 1828
@@ -57,6 +60,13 @@ T-1m..T-1y = 336d/48px   = 7d/px  = 8 bytes * 48px = 384 bytes
 
 
 // Settings
+#define WIFI_CONNECT_ATTEMPTS 20
+#define WIFI_CONNECT_ATTEMPT_INTERVAL_MS 500 // should be > 50
+#define NTP_SERVER "pool.ntp.org"
+#define GMT_OFFSET_SEC 3600
+#define DAYLIGHT_OFFSET_SEC 3600
+
+#define WAKEUP_INTERVAL_MS 2000 // energy drain <--> timekeeping accuracy tradeoff
 #define SENSOR_READ_INTERVAL_SEC 12 // 10 reads/2min
 #define N_UPDATES_BETWEEN_FULL_REPAINTS 10
 

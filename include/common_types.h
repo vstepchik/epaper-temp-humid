@@ -1,5 +1,6 @@
 #pragma once
 
+#include "time.h"
 #include <cstdint>
 #include <sys/types.h>
 
@@ -33,7 +34,7 @@ struct DisplayRenderPayload {
 
     uint64_t sdCardVolumeBytes = 0; // 0 = no sd card
     uint64_t sdCardOccupiedBytes = 0;
-    uint32_t utcTimeSecEpoch = 0;
+    struct tm timeinfo;
     float batteryLevel = 0.0;
 
     DegreesUnit degreesUnit = CELSIUS;

@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <GxEPD2.h>
 #include <GxEPD2_BW.h>
+#include "time.h"
 #include "common_types.h"
 #include "utils.h"
 #include "bitmaps.h"
@@ -17,6 +18,7 @@ public:
   DisplayController();
   void debug_print(char* txt);
   void full_repaint(DisplayRenderPayload* data);
+  void paint_time(tm* timeinfo);
 
 private:
   GxEPD2_BW<GxEPD2_213_B74, GxEPD2_213_B74::HEIGHT> display;
