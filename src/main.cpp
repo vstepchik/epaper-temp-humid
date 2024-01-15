@@ -19,7 +19,7 @@ RTC_DATA_ATTR struct tm timeinfo;
 RTC_DATA_ATTR int64_t lastWakedAt = 0;
 
 Adafruit_Si7021 sensor = Adafruit_Si7021();
-RTC_DATA_ATTR DisplayController display;
+DisplayController display;
 
 bool wasClick = false;
 DisplayRenderPayload displayPayload;
@@ -52,6 +52,25 @@ AlertLevel calcTemperatureAlert(float tempCelsius) {
   return ALERT_DANGER;
 }
 
+bool setupInterrupts() {
+  uint16_t code = esp_sleep_enable_ext0_wakeup(ONBOARD_BUTTON_PIN, LOW);
+  switch (code) {
+    case ESP_OK:
+      return true;
+    case ESP_ERR_INVALID_ARG:
+      snprintf(buf, sizeof(buf), "Failed to set button wakeup trigger: the selected GPIO is not an RTC GPIO, or the mode is invalid");
+      break;
+    case ESP_ERR_INVALID_STATE:
+      snprintf(buf, sizeof(buf), "Failed to set button wakeup trigger: wakeup triggers conflict");
+      break;
+    default:
+      snprintf(buf, sizeof(buf), "Failed to set button wakeup trigger: code %i", code);
+      break;
+  };
+  display.debug_print(buf);
+  return false;
+}
+
 bool syncTime() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   uint8_t attempts = WIFI_CONNECT_ATTEMPTS;
@@ -77,54 +96,41 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(ONBOARD_BUTTON_PIN, INPUT_PULLUP);
 
+  wasClick = false;
+  if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
+      wasClick = true; 
+      digitalWrite(LED_BUILTIN, HIGH); delay(200);
+      digitalWrite(LED_BUILTIN, LOW);  delay(50);
+  }
+  if (wasClick) {
+    repaintRequested = true;
+  }
   // Blink once for wakeup
   digitalWrite(LED_BUILTIN, HIGH);
   delay(20);
   digitalWrite(LED_BUILTIN, LOW);
 
-  switch(esp_sleep_get_wakeup_cause()){
-    case ESP_SLEEP_WAKEUP_EXT0 : wasClick = true; break;
-    case ESP_SLEEP_WAKEUP_EXT1 : break;
-    case ESP_SLEEP_WAKEUP_TIMER : break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD : break;
-    case ESP_SLEEP_WAKEUP_ULP : break;
-    default : break;
-  }
+  if (!setupInterrupts()) return;
 
-
-  if (!timeSynced) {
-    // timeSynced = syncTime();
-  }
+  // if (!timeSynced) {
+  //   timeSynced = syncTime();
+  // }
   if(!getLocalTime(&timeinfo)) {
     snprintf(buf, sizeof(buf), "Failed to get time :(");
+    display.debug_print(buf);
+    return;
   }
 
   int64_t now = esp_timer_get_time();
   uint32_t microsSinceLastWakeup = now - lastWakedAt;
   lastWakedAt = now;
-  if (wasClick) {
-    repaintRequested = true;
-  }
 
-  switch (esp_sleep_enable_ext0_wakeup(GPIO_NUM_39, LOW)) {
-    case ESP_OK:
-      break;
-    case ESP_ERR_INVALID_ARG:
-      snprintf(buf, sizeof(buf), "The selected GPIO is not an RTC GPIO, or the mode is invalid");
-      display.debug_print(buf);
-      return;
-    case ESP_ERR_INVALID_STATE:
-      snprintf(buf, sizeof(buf), "Wakeup triggers conflict");
-      display.debug_print(buf);
-      return;
-  };
-
-  if (!sensor.begin()) {
+  if (sensor.begin()) {
+    sensor.heater(false);
+  } else {
     snprintf(buf, sizeof(buf), "Sensor no begin :(");
     display.debug_print(buf);
     return;
-  } else {
-    sensor.heater(false);
   }
 
   displayPayload.degreesUnit = CELSIUS;
@@ -136,8 +142,6 @@ void setup() {
     displayPayload.currentHumidity = sensor.readHumidity();
     displayPayload.humidityAlert = calcHumidityAlert(displayPayload.currentHumidity);
     displayPayload.batteryLevel = batteryAdcToFullness(analogRead(BATTERY_ADC_PIN));
-    // displayPayload.sdCardVolumeBytes = (uint64_t) 1000 * 1000 * 1000 * 32;
-    // displayPayload.sdCardOccupiedBytes = (uint64_t) 1024 * 1024 * 2 * displayPayload.currentTemperatureCelsius;
 
     displayPayload.statsT1D = {
       .average = displayPayload.currentTemperatureCelsius,
@@ -155,21 +159,20 @@ void setup() {
     };
     displayPayload.statsH1W = displayPayload.statsH1D;
     displayPayload.statsH1M = displayPayload.statsH1D;
-    // end debug
 
     display.full_repaint(&displayPayload);
     repaintRequested = false;
   }
-  display.paint_time(&displayPayload.timeinfo);
-
-  digitalWrite(LED_BUILTIN, HIGH); delay(5);
-  digitalWrite(LED_BUILTIN, LOW);  delay(50);
-  digitalWrite(LED_BUILTIN, HIGH); delay(5);
-  digitalWrite(LED_BUILTIN, LOW);  delay(50);
-
-  esp_deep_sleep(MICROSECONDS_PER_MILLISECOND * WAKEUP_INTERVAL_MS);
+  // display.paint_time(&displayPayload.timeinfo);
 }
 
-void loop() { 
-  // never executed
+void loop() {
+  // blink before sleep
+  digitalWrite(LED_BUILTIN, HIGH); delay(5);
+  digitalWrite(LED_BUILTIN, LOW);  delay(50);
+  digitalWrite(LED_BUILTIN, HIGH); delay(5);
+  digitalWrite(LED_BUILTIN, LOW);  delay(50);
+
+  // will reset from setup() after wakeup
+  esp_deep_sleep(MICROSECONDS_PER_MILLISECOND * WAKEUP_INTERVAL_MS);
 }
