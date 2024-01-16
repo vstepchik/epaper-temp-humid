@@ -4,8 +4,8 @@
 unsigned long ET = 0;
 const char y04b = Font_04b03b.yAdvance / 2 + 1;
 
-DisplayController::DisplayController() : display(GxEPD2_213_B74(5, 17, 16, 4)) {
-    display.init();
+DisplayController::DisplayController(bool initial) : display(GxEPD2_213_B74(5, 17, 16, 4)) {
+    display.init(0, initial);
     display.setRotation(3);
     display.setFullWindow();
     display.setTextColor(GxEPD_BLACK);
@@ -45,15 +45,18 @@ void DisplayController::debug_print(char* txt) {
     display.hibernate();
 }
 
-void DisplayController::full_repaint(DisplayRenderPayload* data) {
+void DisplayController::repaint(bool fullRepaint, DisplayRenderPayload* data) {
     unsigned long T1 = 0, T2 = 0;
     const float currentTemp = celsiusTo(data->currentTemperatureCelsius, data->degreesUnit);
     const char unitSymbol = data->degreesUnit == CELSIUS ? 'C' : 'F';
     int16_t tbx, tby; uint16_t tbw, tbh;
     char buf[5];
     
-    display.setFullWindow();
-    // display.setPartialWindow(1, 1, 100, 100);
+    if (fullRepaint) {
+        display.setFullWindow();
+    } else {
+        display.setPartialWindow(0, 0, display.width(), display.height());
+    }
     display.firstPage();
     do {
         T1 = micros();
@@ -202,13 +205,6 @@ void DisplayController::drawStatusBar(DisplayRenderPayload* data) {
         display.print(buf);
     }
 
-    // time
-    display.setFont(&Font_04b03b);
-    char buf[19];
-    strftime(buf, sizeof(buf), "%Y-%m-%d - %H:%M", &data->timeinfo);
-    display.setCursor(152, y04b);
-    display.print(buf);
-
     // battery
     display.drawInvertedBitmap(236, 0, bmp_bat_full, 14, 5, GxEPD_BLACK);
     int8_t bat_pixels_empty = (1.0 - data->batteryLevel) * 11;
@@ -229,8 +225,7 @@ void DisplayController::paint_time(tm* timeinfo) {
     display.setPartialWindow(152, 0, tbw, tbh);
     display.firstPage();
     do {
-        display.fillRect(0, 0, tbw, tbh, GxEPD_WHITE);
-        display.setCursor(0, y04b);
+        display.setCursor(152, y04b);
         display.print(buf);
     } while (display.nextPage());
 }
@@ -353,12 +348,6 @@ void DisplayController::drawHistoryGraph(DisplayRenderPayload* data, const char 
     display.print(buf);
 
     // graph - values
-    if (data->sdCardVolumeBytes == 0) {
-        display.drawFastVLine(120, 68, 18, GxEPD_BLACK);
-        display.drawFastVLine(120, 96, 18, GxEPD_BLACK);
-        display.drawInvertedBitmap(40, 72, bmp_no_sd_card, 48, 10, GxEPD_BLACK);
-        display.drawInvertedBitmap(40, 100, bmp_no_sd_card, 48, 10, GxEPD_BLACK);
-    }
     for (uint8_t i = 0; i < 112; i++) {
         uint8_t val = sin((float) i / 20) * 5.0 + 11;
         display.drawFastVLine(i + 121, 86 - val, val, GxEPD_BLACK);

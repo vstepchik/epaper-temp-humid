@@ -4,6 +4,9 @@
 #include <Adafruit_Si7021.h>
 #include <WiFi.h>
 
+#include "GxEPD2.h"
+#include "fnt_04b03b.h"
+#include "fnt_big_digits.h"
 #include "time.h"
 #include "display_controller.h"
 #include "common_types.h"
@@ -13,13 +16,15 @@
 
 
 // RUNTIME STATE
+RTC_DATA_ATTR bool initial = true;
 RTC_DATA_ATTR bool repaintRequested = true;
 RTC_DATA_ATTR bool timeSynced = false;
 RTC_DATA_ATTR struct tm timeinfo;
-RTC_DATA_ATTR int64_t lastWakedAt = 0;
+RTC_DATA_ATTR uint32_t wakeupCounter = 0;
+RTC_DATA_ATTR uint32_t repaintCounter = 0;
 
 Adafruit_Si7021 sensor = Adafruit_Si7021();
-DisplayController display;
+RTC_DATA_ATTR DisplayController display(initial);
 
 bool wasClick = false;
 DisplayRenderPayload displayPayload;
@@ -84,7 +89,7 @@ bool syncTime() {
     delay(40);
     digitalWrite(LED_BUILTIN, LOW);
   }
-  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+  configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER_0, NTP_SERVER_1, NTP_SERVER_2);
   delay(500);
   getLocalTime(&timeinfo);
   WiFi.disconnect(true);
@@ -96,34 +101,40 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(ONBOARD_BUTTON_PIN, INPUT_PULLUP);
 
+  Serial.begin(115200);
+  Serial.print("Wakeup!!!!!! #");
+  Serial.println(++wakeupCounter);
+
   wasClick = false;
   if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
       wasClick = true; 
       digitalWrite(LED_BUILTIN, HIGH); delay(200);
       digitalWrite(LED_BUILTIN, LOW);  delay(50);
   }
+  Serial.print("Was click: ");
+  Serial.println(wasClick);
   if (wasClick) {
     repaintRequested = true;
   }
+  Serial.print("Repaint requested: ");
+  Serial.println(repaintRequested);
   // Blink once for wakeup
   digitalWrite(LED_BUILTIN, HIGH);
   delay(20);
   digitalWrite(LED_BUILTIN, LOW);
 
   if (!setupInterrupts()) return;
+  Serial.println("Interrupts set.");
 
-  // if (!timeSynced) {
-  //   timeSynced = syncTime();
-  // }
+  if (!timeSynced) {
+    timeSynced = syncTime();
+  }
   if(!getLocalTime(&timeinfo)) {
     snprintf(buf, sizeof(buf), "Failed to get time :(");
     display.debug_print(buf);
     return;
   }
 
-  int64_t now = esp_timer_get_time();
-  uint32_t microsSinceLastWakeup = now - lastWakedAt;
-  lastWakedAt = now;
 
   if (sensor.begin()) {
     sensor.heater(false);
@@ -136,6 +147,7 @@ void setup() {
   displayPayload.degreesUnit = CELSIUS;
 
   if (repaintRequested) {
+    Serial.println("Repainting");
     displayPayload.timeinfo = timeinfo;
     displayPayload.currentTemperatureCelsius = sensor.readTemperature();
     displayPayload.temperatureAlert = calcTemperatureAlert(displayPayload.currentTemperatureCelsius);
@@ -160,10 +172,14 @@ void setup() {
     displayPayload.statsH1W = displayPayload.statsH1D;
     displayPayload.statsH1M = displayPayload.statsH1D;
 
-    display.full_repaint(&displayPayload);
-    repaintRequested = false;
+    display.repaint(repaintCounter % 5 == 0, &displayPayload);
+    repaintCounter += 1;
+    // repaintRequested = false;
   }
-  // display.paint_time(&displayPayload.timeinfo);
+  display.paint_time(&displayPayload.timeinfo);
+  Serial.println("Going to bed.. z-z-z-z");
+  Serial.flush();
+  initial = false;
 }
 
 void loop() {

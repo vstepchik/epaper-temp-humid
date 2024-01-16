@@ -15,9 +15,9 @@
 
 class DisplayController {
 public:
-  DisplayController();
+  DisplayController(bool initial);
   void debug_print(char* txt);
-  void full_repaint(DisplayRenderPayload* data);
+  void repaint(bool fullRepaint, DisplayRenderPayload* data);
   void paint_time(tm* timeinfo);
 
 private:

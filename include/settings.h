@@ -62,7 +62,9 @@ T-1m..T-1y = 336d/48px   = 7d/px  = 8 bytes * 48px = 384 bytes
 // Settings
 #define WIFI_CONNECT_ATTEMPTS 20
 #define WIFI_CONNECT_ATTEMPT_INTERVAL_MS 500 // should be > 50
-#define NTP_SERVER "pool.ntp.org"
+#define NTP_SERVER_0 "pool.ntp.org"
+#define NTP_SERVER_1 "time.google.com"
+#define NTP_SERVER_2 "time.cloudflare.com"
 #define GMT_OFFSET_SEC 3600
 #define DAYLIGHT_OFFSET_SEC 3600
 
