@@ -21,7 +21,6 @@ RTC_DATA_ATTR bool repaintRequested = true;
 RTC_DATA_ATTR bool timeSynced = false;
 RTC_DATA_ATTR struct tm timeinfo;
 RTC_DATA_ATTR uint32_t wakeupCounter = 0;
-RTC_DATA_ATTR uint32_t repaintCounter = 0;
 
 Adafruit_Si7021 sensor = Adafruit_Si7021();
 RTC_DATA_ATTR DisplayController display(initial);
@@ -100,6 +99,7 @@ bool syncTime() {
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(ONBOARD_BUTTON_PIN, INPUT_PULLUP);
+  unsigned long wakeupTime = micros();
 
   Serial.begin(115200);
   Serial.print("Wakeup!!!!!! #");
@@ -127,13 +127,13 @@ void setup() {
   Serial.println("Interrupts set.");
 
   if (!timeSynced) {
-    timeSynced = syncTime();
+    // timeSynced = syncTime();
   }
-  if(!getLocalTime(&timeinfo)) {
-    snprintf(buf, sizeof(buf), "Failed to get time :(");
-    display.debug_print(buf);
-    return;
-  }
+  // if(!getLocalTime(&timeinfo)) {
+  //   snprintf(buf, sizeof(buf), "Failed to get time :(");
+  //   display.debug_print(buf);
+  //   return;
+  // }
 
 
   if (sensor.begin()) {
@@ -172,12 +172,12 @@ void setup() {
     displayPayload.statsH1W = displayPayload.statsH1D;
     displayPayload.statsH1M = displayPayload.statsH1D;
 
-    display.repaint(repaintCounter % 5 == 0, &displayPayload);
-    repaintCounter += 1;
+    display.repaint(false, &displayPayload);
     // repaintRequested = false;
   }
-  display.paint_time(&displayPayload.timeinfo);
-  Serial.println("Going to bed.. z-z-z-z");
+  Serial.print("Going to bed.. (total wakeup time ");
+  Serial.print(micros() - wakeupTime);
+  Serial.println("us) z-z-z-z");
   Serial.flush();
   initial = false;
 }
