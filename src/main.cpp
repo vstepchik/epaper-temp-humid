@@ -30,7 +30,7 @@ DisplayRenderPayload displayPayload;
 
 char buf[1024];
 
-float batteryAdcToFullness(uint16_t adcValue) {
+inline float batteryAdcToFullness(uint16_t adcValue) {
     // Clamping the voltage values to the battery's min and max voltages
     if (adcValue >= BATT_FULL) {
         return 1.0f;
@@ -44,20 +44,20 @@ float batteryAdcToFullness(uint16_t adcValue) {
     return (float)(adcValue - BATT_EMPTY) / (BATT_FULL - BATT_EMPTY);
 }
 
-AlertLevel calcHumidityAlert(float humidity) {
+inline AlertLevel calcHumidityAlert(float humidity) {
   if (humidity >= 62.0 && humidity <= 73.0) return ALERT_NONE;
   if (humidity >= 60.0 && humidity <= 75.0) return ALERT_WARNING;
   return ALERT_DANGER;
 }
 
-AlertLevel calcTemperatureAlert(float tempCelsius) {
+inline AlertLevel calcTemperatureAlert(float tempCelsius) {
   if (tempCelsius >= 19.0 && tempCelsius <= 22.0) return ALERT_NONE;
   if (tempCelsius >= 17.0 && tempCelsius <= 24.0) return ALERT_WARNING;
   return ALERT_DANGER;
 }
 
-bool setupInterrupts() {
-  uint16_t code = esp_sleep_enable_ext0_wakeup(ONBOARD_BUTTON_PIN, LOW);
+inline bool setupInterrupts() {
+  const uint16_t code = esp_sleep_enable_ext0_wakeup(ONBOARD_BUTTON_PIN, LOW);
   switch (code) {
     case ESP_OK:
       return true;
@@ -172,7 +172,7 @@ void setup() {
     displayPayload.statsH1W = displayPayload.statsH1D;
     displayPayload.statsH1M = displayPayload.statsH1D;
 
-    display.repaint(false, &displayPayload);
+    display.repaint(DisplayController::DrawFlags::CURRENT_READINGS | DisplayController::DrawFlags::GAUGES, &displayPayload);
     // repaintRequested = false;
   }
   Serial.print("Going to bed.. (total wakeup time ");

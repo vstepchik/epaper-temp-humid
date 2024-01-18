@@ -11,7 +11,7 @@ float celsiusTo(const float celsius, const DegreesUnit unit) {
 }
 
 void formatSize(uint64_t bytes, char* result, uint8_t resultSize) {
-    const char* suffixes = " KMGT";
+    static const char* suffixes = " KMGT";
     uint8_t suffixIndex = 0;
     double size = bytes;
 
