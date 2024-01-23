@@ -12,16 +12,12 @@ enum AlertLevel {
     ALERT_NONE, ALERT_WARNING, ALERT_DANGER,
 };
 
-struct SensorReading {
-    float tempCelsius;
-    float humidity;
-};
-
+template <typename T>
 struct MeasurementStatistics {
-    float average;
-    float median;
-    float max;
-    float min;
+    T average;
+    T median;
+    T max;
+    T min;
 };
 
 struct DisplayRenderPayload {
@@ -42,11 +38,11 @@ struct DisplayRenderPayload {
     float currentHumidity = 0.0;
     AlertLevel temperatureAlert = ALERT_NONE;
     AlertLevel humidityAlert = ALERT_NONE;
-    MeasurementStatistics statsT1D;
-    MeasurementStatistics statsT1W;
-    MeasurementStatistics statsT1M;
-    MeasurementStatistics statsH1D;
-    MeasurementStatistics statsH1W;
-    MeasurementStatistics statsH1M;
+    MeasurementStatistics<float> statsT1D;
+    MeasurementStatistics<float> statsT1W;
+    MeasurementStatistics<float> statsT1M;
+    MeasurementStatistics<float> statsH1D;
+    MeasurementStatistics<float> statsH1W;
+    MeasurementStatistics<float> statsH1M;
     // todo: add references to arrays for chart data
 };

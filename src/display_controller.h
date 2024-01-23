@@ -48,7 +48,7 @@ private:
   void drawAllStats(DisplayRenderPayload* data);
 
   template<typename StatsConversion>
-  void drawStats(unsigned char x, unsigned char y, MeasurementStatistics stats, StatsConversion conversion);
+  void drawStats(unsigned char x, unsigned char y, MeasurementStatistics<float> stats, StatsConversion conversion);
 
   void drawHistoryGraph(DisplayRenderPayload* data, const char unitSymbol);
 };

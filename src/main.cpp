@@ -3,6 +3,7 @@
 #include <esp32-hal-timer.h>
 #include <Adafruit_Si7021.h>
 #include <WiFi.h>
+#include "esp_heap_caps.h"
 
 #include "GxEPD2.h"
 #include "fnt_04b03b.h"
@@ -13,6 +14,7 @@
 #include "esp32-hal.h"
 #include "credentials.h"
 #include "settings.h"
+#include "stats_collector.h"
 
 
 // RUNTIME STATE
@@ -21,9 +23,12 @@ RTC_DATA_ATTR bool repaintRequested = true;
 RTC_DATA_ATTR bool timeSynced = false;
 RTC_DATA_ATTR struct tm timeinfo;
 RTC_DATA_ATTR uint32_t wakeupCounter = 0;
+static RTC_DATA_ATTR RingBuf<float, 5> testRtcBuf;
 
-Adafruit_Si7021 sensor = Adafruit_Si7021();
-RTC_DATA_ATTR DisplayController display(initial);
+static Adafruit_Si7021 sensor = Adafruit_Si7021();
+static RTC_DATA_ATTR DisplayController display(initial);
+static RTC_DATA_ATTR StatsCollector<uint16_t> statsCollector;
+
 
 bool wasClick = false;
 DisplayRenderPayload displayPayload;
@@ -126,10 +131,11 @@ void setup() {
   if (!setupInterrupts()) return;
   Serial.println("Interrupts set.");
 
-  if (!timeSynced) {
+  // if (!timeSynced) {
     // timeSynced = syncTime();
-  }
+  // }
   // if(!getLocalTime(&timeinfo)) {
+    // Serial.println("Failed to get time :(");
   //   snprintf(buf, sizeof(buf), "Failed to get time :(");
   //   display.debug_print(buf);
   //   return;
@@ -144,40 +150,49 @@ void setup() {
     return;
   }
 
-  displayPayload.degreesUnit = CELSIUS;
+  Serial.print("sizeof(display) = ");
+  Serial.print(sizeof(display));
+  Serial.println();
 
-  if (repaintRequested) {
+  Serial.print("sizeof(sensor) = ");
+  Serial.print(sizeof(sensor));
+  Serial.println();
+  
+  UpdateFlags statsUpdateFlags = statsCollector.collect(sensor.readTemperature(), sensor.readHumidity());
+  Serial.print("sizeof(statsCollector) = ");
+  Serial.print(sizeof(statsCollector));
+  Serial.println();
+
+  if (repaintRequested || (uint16_t) statsUpdateFlags) {
     Serial.println("Repainting");
+    float t, h;
+    statsCollector.currentReadingMedian(&t, &h);
+
+    displayPayload.degreesUnit = CELSIUS;
     displayPayload.timeinfo = timeinfo;
-    displayPayload.currentTemperatureCelsius = sensor.readTemperature();
+    displayPayload.currentTemperatureCelsius = t;
     displayPayload.temperatureAlert = calcTemperatureAlert(displayPayload.currentTemperatureCelsius);
-    displayPayload.currentHumidity = sensor.readHumidity();
+    displayPayload.currentHumidity = h;
     displayPayload.humidityAlert = calcHumidityAlert(displayPayload.currentHumidity);
     displayPayload.batteryLevel = batteryAdcToFullness(analogRead(BATTERY_ADC_PIN));
 
-    displayPayload.statsT1D = {
-      .average = displayPayload.currentTemperatureCelsius,
-      .median = displayPayload.currentTemperatureCelsius,
-      .max = displayPayload.currentTemperatureCelsius,
-      .min = displayPayload.currentTemperatureCelsius,
-    };
-    displayPayload.statsT1W = displayPayload.statsT1D;
-    displayPayload.statsT1M = displayPayload.statsT1D;
-    displayPayload.statsH1D = {
-      .average = displayPayload.currentHumidity,
-      .median = displayPayload.currentHumidity,
-      .max = displayPayload.currentHumidity,
-      .min = displayPayload.currentHumidity,
-    };
-    displayPayload.statsH1W = displayPayload.statsH1D;
-    displayPayload.statsH1M = displayPayload.statsH1D;
+    displayPayload.statsT1D = statsCollector.statsTemp1D();
+    displayPayload.statsT1W = statsCollector.statsTemp1W();
+    displayPayload.statsT1M = statsCollector.statsTemp1M();
+    displayPayload.statsH1D = statsCollector.statsHumidity1D();
+    displayPayload.statsH1W = statsCollector.statsHumidity1W();
+    displayPayload.statsH1M = statsCollector.statsHumidity1M();
 
     display.repaint(DisplayController::DrawFlags::CURRENT_READINGS | DisplayController::DrawFlags::GAUGES, &displayPayload);
     // repaintRequested = false;
   }
+
+  statsCollector.printDebug();
+  // heap_caps_print_heap_info(MALLOC_CAP_8BIT);
+
   Serial.print("Going to bed.. (total wakeup time ");
   Serial.print(micros() - wakeupTime);
-  Serial.println("us) z-z-z-z");
+  Serial.println("us) z-z-z-z\n\n");
   Serial.flush();
   initial = false;
 }

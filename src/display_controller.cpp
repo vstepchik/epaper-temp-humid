@@ -244,7 +244,7 @@ void DisplayController::drawAllStats(DisplayRenderPayload* data) {
 }
 
 template<typename StatsConversion>
-void DisplayController::drawStats(unsigned char x, unsigned char y, MeasurementStatistics stats, StatsConversion conversion) {
+void DisplayController::drawStats(unsigned char x, unsigned char y, MeasurementStatistics<float> stats, StatsConversion conversion) {
     const uint8_t adv = TomThumb.yAdvance;
     display.setCursor(x + 1, y + adv);
     display.print(conversion(stats.average), 1);
