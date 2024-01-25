@@ -157,12 +157,12 @@ void setup() {
   Serial.print(sizeof(sensor));
   Serial.println();
   
-  UpdateFlags statsUpdateFlags = statsCollector.collect(sensor.readTemperature(), sensor.readHumidity());
+  UpdateFlags updateFlags = statsCollector.collect(sensor.readTemperature(), sensor.readHumidity());
   Serial.print("sizeof(statsCollector) = ");
   Serial.print(sizeof(statsCollector));
   Serial.println();
 
-  if (repaintRequested || (uint16_t) statsUpdateFlags) {
+  if (repaintRequested || (uint16_t) updateFlags) {
     Serial.println("Repainting");
     float t, h;
     statsCollector.currentReadingMedian(&t, &h);
@@ -183,11 +183,10 @@ void setup() {
     displayPayload.statsH1M = statsCollector.statsHumidity1M();
 
     display.repaint(DisplayController::DrawFlags::CURRENT_READINGS | DisplayController::DrawFlags::GAUGES, &displayPayload);
-    // repaintRequested = false;
+    repaintRequested = false;
   }
 
   statsCollector.printDebug();
-  // heap_caps_print_heap_info(MALLOC_CAP_8BIT);
 
   Serial.print("Going to bed.. (total wakeup time ");
   Serial.print(micros() - wakeupTime);

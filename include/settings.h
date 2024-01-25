@@ -13,7 +13,7 @@
 #define MICROSECONDS_PER_SECOND 1000000
 #define MICROSECONDS_PER_MILLISECOND 1000
 
-#define BATT_EMPTY 1828 // value at 3.2V
+#define BATT_EMPTY 1860 // value at 3.25V
 /*
 3.20v = 1828
 3.25v = 1860
@@ -37,7 +37,7 @@
 4.15v = 2420
 4.20v = 2450
 */
-#define BATT_FULL 2450 // value at 4.2V
+#define BATT_FULL 2420 // value at 4.15V
 
 
 /*
@@ -59,7 +59,7 @@ T-1m..T-1y = 336d/48px   = 7d/px  = 8 bytes * 48px = 384 bytes
 
 // Settings
 #define WIFI_CONNECT_ATTEMPTS 20
-#define WIFI_CONNECT_ATTEMPT_INTERVAL_MS 500 // should be > 50
+#define WIFI_CONNECT_ATTEMPT_INTERVAL_MS 250 // should be > 50
 #define SYNC_TIME_OVER_WIFI_EVERY_MINUTES 60*8
 #define NTP_SERVER_0 "pool.ntp.org"
 #define NTP_SERVER_1 "time.google.com"

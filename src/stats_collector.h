@@ -6,6 +6,7 @@
 #include <AceSorting.h>
 
 #include "common_types.h"
+#include "display_controller.h"
 #include "esp32-hal.h"
 #include "settings.h"
 
@@ -155,8 +156,16 @@ public:
   UpdateFlags collect(float temperature, float humidity) {
     state.currentReadingBufT.pushOverwrite(pack<compact_t>(temperature));
     state.currentReadingBufH.pushOverwrite(pack<compact_t>(humidity));
-    UpdateFlags updateFlags = UpdateFlags::CURRENT_READING;
-    
+    auto prevTempMedian = state.statsTempCurrent.median;
+    auto prevHumidityMedian = state.statsHumidityCurrent.median;
+    const static auto currentValueMedianSize = 3;
+    state.statsTempCurrent = calculateStatistics<compact_t, CURRENT_READING_MEDIAN_FILTER_SIZE>(state.currentReadingBufT, currentValueMedianSize);
+    state.statsHumidityCurrent = calculateStatistics<compact_t, CURRENT_READING_MEDIAN_FILTER_SIZE>(state.currentReadingBufH, currentValueMedianSize);
+    UpdateFlags updateFlags = UpdateFlags::NONE;
+    if (state.statsTempCurrent.median != prevTempMedian || state.statsHumidityCurrent.median != prevHumidityMedian) {
+      updateFlags |= UpdateFlags::CURRENT_READING;
+    }
+
     time_t now;
     time(&now);
     time_t elapsedTimeSec = now - state.lastCollectedAtUnixTimeSec;
@@ -202,6 +211,42 @@ public:
       state.yearBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_23D>(state.monthBufT, 7*24/8).median);
       state.yearBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_23D>(state.monthBufH, 7*24/8).median);
       updateFlags |= UpdateFlags::HISTORY_YEAR;
+    }
+
+    // update d/w/m statistics every hour
+    if (isFlagSet(updateFlags, UpdateFlags::HISTORY_HOUR)) {
+      auto hourT = calculateStatistics<compact_t, PX_PER_1H>(state.hourBufT).median;
+      auto hourH = calculateStatistics<compact_t, PX_PER_1H>(state.hourBufH).median;
+      
+      RingBuf<compact_t, PX_PER_23H+1> fullDay;
+      fullDay.pushOverwrite(hourT);
+      for (int i = 0; i < state.dayBufT.size(); ++i) { fullDay.pushOverwrite(state.dayBufT[i]); }
+      state.statsTemp1D = calculateStatistics<compact_t, PX_PER_23H+1>(fullDay);
+      fullDay.clear();
+      fullDay.pushOverwrite(hourH);
+      for (int i = 0; i < state.dayBufH.size(); ++i) { fullDay.pushOverwrite(state.dayBufH[i]); }
+      state.statsHumidity1D = calculateStatistics<compact_t, PX_PER_23H+1>(fullDay);
+      updateFlags |= UpdateFlags::STATS_DAY;
+
+      RingBuf<compact_t, PX_PER_6D+1> fullWeek;
+      fullWeek.pushOverwrite(state.statsTemp1D.median);
+      for (int i = 0; i < state.weekBufT.size(); ++i) { fullWeek.pushOverwrite(state.weekBufT[i]); }
+      state.statsTemp1W = calculateStatistics<compact_t, PX_PER_6D+1>(fullWeek);
+      fullWeek.clear();
+      fullWeek.pushOverwrite(state.statsHumidity1D.median);
+      for (int i = 0; i < state.weekBufH.size(); ++i) { fullWeek.pushOverwrite(state.weekBufH[i]); }
+      state.statsHumidity1W = calculateStatistics<compact_t, PX_PER_6D+1>(fullWeek);
+      updateFlags |= UpdateFlags::STATS_WEEK;
+
+      RingBuf<compact_t, PX_PER_23D+1> fullMonth;
+      fullMonth.pushOverwrite(state.statsTemp1W.median);
+      for (int i = 0; i < state.monthBufT.size(); ++i) { fullMonth.pushOverwrite(state.monthBufT[i]); }
+      state.statsTemp1M = calculateStatistics<compact_t, PX_PER_23D+1>(fullMonth);
+      fullMonth.clear();
+      fullMonth.pushOverwrite(state.statsHumidity1W.median);
+      for (int i = 0; i < state.monthBufH.size(); ++i) { fullMonth.pushOverwrite(state.monthBufH[i]); }
+      state.statsHumidity1M = calculateStatistics<compact_t, PX_PER_23D+1>(fullMonth);
+      updateFlags |= UpdateFlags::STATS_MONTH;
     }
 
     return updateFlags;
