@@ -50,7 +50,6 @@ T-1w..T-1m = 23*24h/69px = 8h/px  = 8 bytes * 69px = 552 bytes
 T-1m..T-1y = 336d/48px   = 7d/px  = 8 bytes * 48px = 384 bytes
 -- TOTAL ------------------------------------------ 1832 bytes
 */
-#define READING_SIZE_BYTES sizeof(float)*2
 #define PX_PER_1H 30
 #define PX_PER_23H 46
 #define PX_PER_6D 36

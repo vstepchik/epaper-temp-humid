@@ -23,6 +23,30 @@ enum class UpdateFlags : uint16_t {
     HISTORY_YEAR     = 1 << 8, // 256
 };
 
+inline UpdateFlags operator|=(UpdateFlags a, UpdateFlags b) {
+  return static_cast<UpdateFlags>(static_cast<uint16_t>(a) | static_cast<uint16_t>(b));
+}
+
+inline UpdateFlags operator|(UpdateFlags a, UpdateFlags b) {
+  return static_cast<UpdateFlags>(static_cast<uint16_t>(a) | static_cast<uint16_t>(b));
+}
+
+inline UpdateFlags operator&(UpdateFlags a, UpdateFlags b) {
+  return static_cast<UpdateFlags>(static_cast<uint16_t>(a) & static_cast<uint16_t>(b));
+}
+
+inline UpdateFlags operator^(UpdateFlags a, UpdateFlags b) {
+  return static_cast<UpdateFlags>(static_cast<uint16_t>(a) ^ static_cast<uint16_t>(b));
+}
+
+inline UpdateFlags operator~(UpdateFlags a) {
+  return static_cast<UpdateFlags>(~static_cast<uint16_t>(a));
+}
+
+inline bool isFlagSet(UpdateFlags flags, UpdateFlags flagToCheck) {
+  return (flags & flagToCheck) == flagToCheck;
+}
+
 template <typename compact_t>
 static inline compact_t pack(float value) {
   return (compact_t) (value * 100.0);
@@ -44,20 +68,23 @@ static inline MeasurementStatistics<float> unpack(MeasurementStatistics<compact_
 }
 
 template<typename T, long S>
-MeasurementStatistics<T> calculateStatistics(RingBuf<T, S>& buffer) {
+MeasurementStatistics<T> calculateStatistics(RingBuf<T, S>& buffer, long onlyLast = S) {
     MeasurementStatistics<T> stats = {0, 0, 0, 0};
     if (buffer.isEmpty()) {
         return stats;
     }
 
-    uint16_t bufferSize = buffer.size();
-    T tempArray[bufferSize];  // For median calculation
+    uint16_t bufferSize = (buffer.size() < static_cast<size_t>(onlyLast)) ? buffer.size() : static_cast<size_t>(onlyLast);
+    T tempArray[bufferSize];  // Adjusted size for median calculation
     T sum = 0;
     T maxValue = buffer[0];
     T minValue = buffer[0];
 
+    // Calculate start index based on onlyLast
+    uint16_t startIndex = (buffer.size() > onlyLast) ? (buffer.size() - onlyLast) : 0;
+
     // Iterating through the buffer to calculate sum, max, and min
-    for (uint16_t i = 0; i < bufferSize; ++i) {
+    for (uint16_t i = startIndex, arrayIndex = 0; i < buffer.size(); ++i, ++arrayIndex) {
         T currentValue = buffer[i];
         sum += currentValue;
         if (currentValue > maxValue) {
@@ -66,7 +93,7 @@ MeasurementStatistics<T> calculateStatistics(RingBuf<T, S>& buffer) {
         if (currentValue < minValue) {
             minValue = currentValue;
         }
-        tempArray[i] = currentValue;  // Copying data for median calculation
+        tempArray[arrayIndex] = currentValue;  // Copying data for median calculation
     }
 
     // Calculate average
@@ -91,7 +118,15 @@ MeasurementStatistics<T> calculateStatistics(RingBuf<T, S>& buffer) {
 template <typename compact_t>
 class StatsCollector {
 public:
-  StatsCollector() : state([]() -> bool { return esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED; }) {
+  StatsCollector(bool initial) : state([]() -> bool { return esp_sleep_get_wakeup_cause() != ESP_SLEEP_WAKEUP_UNDEFINED; }) {
+    if (initial) {
+      // prepare to push as soon as the previous buffer is full
+      state.timeSinceLastHourBufPush = hourBufPushInterval - 1;
+      state.timeSinceLastDayBufPush = dayBufPushInterval - 1;
+      state.timeSinceLastWeekBufPush = weekBufPushInterval - 1;
+      state.timeSinceLastMonthBufPush = monthBufPushInterval - 1;
+      state.timeSinceLastYearBufPush = yearBufPushInterval - 1;
+    }
   }
 
   void printDebug() {
@@ -120,74 +155,56 @@ public:
   UpdateFlags collect(float temperature, float humidity) {
     state.currentReadingBufT.pushOverwrite(pack<compact_t>(temperature));
     state.currentReadingBufH.pushOverwrite(pack<compact_t>(humidity));
+    UpdateFlags updateFlags = UpdateFlags::CURRENT_READING;
     
     time_t now;
     time(&now);
     time_t elapsedTimeSec = now - state.lastCollectedAtUnixTimeSec;
     state.lastCollectedAtUnixTimeSec = now;
 
-    state.timeSinceLastHourBufPush += elapsedTimeSec;
-    state.timeSinceLastDayBufPush += elapsedTimeSec;
-    state.timeSinceLastWeekBufPush += elapsedTimeSec;
-    state.timeSinceLastMonthBufPush += elapsedTimeSec;
-    state.timeSinceLastYearBufPush += elapsedTimeSec;
+    // push readings only if the previous buffers are full
+    state.timeSinceLastHourBufPush += elapsedTimeSec * state.currentReadingBufT.isFull();
+    state.timeSinceLastDayBufPush += elapsedTimeSec * state.hourBufT.isFull();
+    state.timeSinceLastWeekBufPush += elapsedTimeSec * state.dayBufT.isFull();
+    state.timeSinceLastMonthBufPush += elapsedTimeSec * state.weekBufT.isFull();
+    state.timeSinceLastYearBufPush += elapsedTimeSec * state.monthBufT.isFull();
 
-    bool dayStatsUpdated = false;
-    bool weekStatsUpdated = false;
-    bool monthStatsUpdated = false;
-
-    static const uint32_t hourBufPushInterval = 60/PX_PER_1H*60;
     if (state.timeSinceLastHourBufPush >= hourBufPushInterval) {
       state.timeSinceLastHourBufPush -= hourBufPushInterval;
       state.hourBufT.pushOverwrite(calculateStatistics<compact_t, CURRENT_READING_MEDIAN_FILTER_SIZE>(state.currentReadingBufT).median);
       state.hourBufH.pushOverwrite(calculateStatistics<compact_t, CURRENT_READING_MEDIAN_FILTER_SIZE>(state.currentReadingBufH).median);
-      dayStatsUpdated = true;
+      updateFlags |= UpdateFlags::HISTORY_HOUR;
     }
 
-    static const uint32_t dayBufPushInterval = 60/(PX_PER_23H/(24-1))*60;
     if (state.timeSinceLastDayBufPush >= dayBufPushInterval) {
       state.timeSinceLastDayBufPush -= dayBufPushInterval;
-      state.dayBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_1H>(state.hourBufT).median);
-      state.dayBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_1H>(state.hourBufH).median);
-      dayStatsUpdated = true;
+      state.dayBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_1H>(state.hourBufT, 30/2).median);
+      state.dayBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_1H>(state.hourBufH, 30/2).median);
+      updateFlags |= UpdateFlags::HISTORY_DAY;
     }
 
-    static const uint32_t weekBufPushInterval = (7-1)*24/PX_PER_6D*60*60;
     if (state.timeSinceLastWeekBufPush >= weekBufPushInterval) {
       state.timeSinceLastWeekBufPush -= weekBufPushInterval;
-      state.weekBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_23H>(state.dayBufT).median);
-      state.weekBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_23H>(state.dayBufT).median);
-      weekStatsUpdated = true;
+      state.weekBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_23H>(state.dayBufT, 4*60/30).median);
+      state.weekBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_23H>(state.dayBufT, 4*60/30).median);
+      updateFlags |= UpdateFlags::HISTORY_WEEK;
     }
 
-    static const uint32_t monthBufPushInterval = (24-1)*24/PX_PER_23D*60*60;
     if (state.timeSinceLastMonthBufPush >= monthBufPushInterval) {
       state.timeSinceLastMonthBufPush -= monthBufPushInterval;
-      state.monthBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_6D>(state.weekBufT).median);
+      state.monthBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_6D>(state.weekBufT, 8/4).median);
       state.monthBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_6D>(state.weekBufH).median);
-      monthStatsUpdated = true;
+      updateFlags |= UpdateFlags::HISTORY_MONTH;
     }
 
-    static const uint32_t yearBufPushInterval = ((float)(12-1)*30)/PX_PER_11M*60*60*24;
     if (state.timeSinceLastYearBufPush >= yearBufPushInterval) {
       state.timeSinceLastYearBufPush -= yearBufPushInterval;
-      state.yearBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_23D>(state.monthBufT).median);
-      state.yearBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_23D>(state.monthBufH).median);
+      state.yearBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_23D>(state.monthBufT, 7*24/8).median);
+      state.yearBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_23D>(state.monthBufH, 7*24/8).median);
+      updateFlags |= UpdateFlags::HISTORY_YEAR;
     }
 
-    if (dayStatsUpdated) {
-
-    }
-
-    if (weekStatsUpdated) {
-
-    }
-
-    if (monthStatsUpdated) {
-
-    }
-
-    return UpdateFlags::CURRENT_READING;
+    return updateFlags;
   }
 
   void currentReadingMedian(float* temp, float* humidity) {
@@ -268,6 +285,11 @@ private:
   };
 
   State state;
+  static const uint32_t hourBufPushInterval = 60/PX_PER_1H*60; // 2m/px, full buf = 1h
+  static const uint32_t dayBufPushInterval = 60/(PX_PER_23H/(24-1))*60; // 30m/px, full buf = 23h
+  static const uint32_t weekBufPushInterval = (7-1)*24/PX_PER_6D*60*60; // 4h/px, full buf = 6d
+  static const uint32_t monthBufPushInterval = (24-1)*24/PX_PER_23D*60*60; // 8h/px, full buf = 23d
+  static const uint32_t yearBufPushInterval = ((float)(12-1)*30)/PX_PER_11M*60*60*24; // 7d/px, full buf = 11M
 
   template<size_t S>
   void printDebug(const char* name, RingBuf<compact_t, S>& buf) {

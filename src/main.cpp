@@ -23,11 +23,10 @@ RTC_DATA_ATTR bool repaintRequested = true;
 RTC_DATA_ATTR bool timeSynced = false;
 RTC_DATA_ATTR struct tm timeinfo;
 RTC_DATA_ATTR uint32_t wakeupCounter = 0;
-static RTC_DATA_ATTR RingBuf<float, 5> testRtcBuf;
 
 static Adafruit_Si7021 sensor = Adafruit_Si7021();
 static RTC_DATA_ATTR DisplayController display(initial);
-static RTC_DATA_ATTR StatsCollector<uint16_t> statsCollector;
+static RTC_DATA_ATTR StatsCollector<uint16_t> statsCollector(initial);
 
 
 bool wasClick = false;
@@ -195,9 +194,8 @@ void setup() {
   Serial.println("us) z-z-z-z\n\n");
   Serial.flush();
   initial = false;
-}
 
-void loop() {
+
   // blink before sleep
   digitalWrite(LED_BUILTIN, HIGH); delay(5);
   digitalWrite(LED_BUILTIN, LOW);  delay(50);
@@ -205,5 +203,9 @@ void loop() {
   digitalWrite(LED_BUILTIN, LOW);  delay(50);
 
   // will reset from setup() after wakeup
-  esp_deep_sleep(MICROSECONDS_PER_MILLISECOND * WAKEUP_INTERVAL_MS);
+  auto sleepInterval = MICROSECONDS_PER_MILLISECOND * WAKEUP_INTERVAL_MS;
+  esp_deep_sleep(constrain(sleepInterval - wakeupTime, MICROSECONDS_PER_MILLISECOND * 100, sleepInterval));
+}
+
+void loop() {
 }
