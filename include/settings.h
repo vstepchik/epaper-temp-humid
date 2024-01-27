@@ -40,21 +40,12 @@
 #define BATT_FULL 2420 // value at 4.15V
 
 
-/*
-single measurement = 4b float humidity + 4b float temperature = 8 bytes
-
-T-0..T-1h  = 60m/30px    = 2m/px  = 8 bytes * 30px = 240 bytes
-T-1h..T-1d = 23h/46px    = 30m/px = 8 bytes * 46px = 368 bytes
-T-1d..T-1w = 6*24h/36px  = 4h/px  = 8 bytes * 36px = 288 bytes
-T-1w..T-1m = 23*24h/69px = 8h/px  = 8 bytes * 69px = 552 bytes
-T-1m..T-1y = 336d/48px   = 7d/px  = 8 bytes * 48px = 384 bytes
--- TOTAL ------------------------------------------ 1832 bytes
-*/
 #define PX_PER_1H 30
 #define PX_PER_23H 46
 #define PX_PER_6D 36
 #define PX_PER_23D 69
 #define PX_PER_11M 48
+#define CHART_LEN_PX PX_PER_1H + PX_PER_23H + PX_PER_6D + PX_PER_23D + PX_PER_11M
 
 
 // Settings
@@ -67,7 +58,7 @@ T-1m..T-1y = 336d/48px   = 7d/px  = 8 bytes * 48px = 384 bytes
 #define GMT_OFFSET_SEC 3600
 #define DAYLIGHT_OFFSET_SEC 3600
 
-#define WAKEUP_INTERVAL_MS 5000 // energy drain <--> timekeeping accuracy tradeoff
+#define WAKEUP_INTERVAL_MS 12000 // energy drain <--> timekeeping accuracy tradeoff
 #define SENSOR_READ_INTERVAL_SEC 12 // 10 reads/2min
 #define CURRENT_READING_MEDIAN_FILTER_SIZE 60/PX_PER_1H*60/SENSOR_READ_INTERVAL_SEC
 #define N_UPDATES_BETWEEN_FULL_REPAINTS 10

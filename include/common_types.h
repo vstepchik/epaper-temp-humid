@@ -3,6 +3,7 @@
 #include "time.h"
 #include <cstdint>
 #include <sys/types.h>
+#include "settings.h"
 
 enum DegreesUnit {
     CELSIUS, FARENHEIT,
@@ -21,7 +22,7 @@ struct MeasurementStatistics {
 };
 
 struct DisplayRenderPayload {
-    float chartYAxisLowTempCelsiusBound = -10.0;
+    float chartYAxisLowTempCelsiusBound = 10.0;
     float chartYAxisHighTempCelsiusBound = 30.0;
     float chartYAxisLowHumidityBound = 0.0;
     float chartYAxisHighHumidityBound = 100.0;
@@ -44,5 +45,7 @@ struct DisplayRenderPayload {
     MeasurementStatistics<float> statsH1D;
     MeasurementStatistics<float> statsH1W;
     MeasurementStatistics<float> statsH1M;
-    // todo: add references to arrays for chart data
+
+    float historyChartT[CHART_LEN_PX];
+    float historyChartH[CHART_LEN_PX];
 };

@@ -3,6 +3,7 @@
 #include <esp32-hal-timer.h>
 #include <Adafruit_Si7021.h>
 #include <WiFi.h>
+#include "esp_attr.h"
 #include "esp_heap_caps.h"
 
 #include "GxEPD2.h"
@@ -32,7 +33,7 @@ static RTC_DATA_ATTR StatsCollector<uint16_t> statsCollector(initial);
 bool wasClick = false;
 DisplayRenderPayload displayPayload;
 
-char buf[1024];
+char buf[128];
 
 inline float batteryAdcToFullness(uint16_t adcValue) {
     // Clamping the voltage values to the battery's min and max voltages
@@ -130,16 +131,15 @@ void setup() {
   if (!setupInterrupts()) return;
   Serial.println("Interrupts set.");
 
-  // if (!timeSynced) {
-    // timeSynced = syncTime();
-  // }
-  // if(!getLocalTime(&timeinfo)) {
-    // Serial.println("Failed to get time :(");
-  //   snprintf(buf, sizeof(buf), "Failed to get time :(");
-  //   display.debug_print(buf);
-  //   return;
-  // }
-
+  if (!timeSynced) {
+    timeSynced = syncTime();
+  }
+  if(!getLocalTime(&timeinfo)) {
+    Serial.println("Failed to get time :(");
+    snprintf(buf, sizeof(buf), "Failed to get time :(");
+    display.debug_print(buf);
+    return;
+  }
 
   if (sensor.begin()) {
     sensor.heater(false);
@@ -148,19 +148,10 @@ void setup() {
     display.debug_print(buf);
     return;
   }
-
-  Serial.print("sizeof(display) = ");
-  Serial.print(sizeof(display));
-  Serial.println();
-
-  Serial.print("sizeof(sensor) = ");
-  Serial.print(sizeof(sensor));
-  Serial.println();
   
   UpdateFlags updateFlags = statsCollector.collect(sensor.readTemperature(), sensor.readHumidity());
-  Serial.print("sizeof(statsCollector) = ");
-  Serial.print(sizeof(statsCollector));
-  Serial.println();
+  Serial.print("updateFlags: ");
+  Serial.println((uint16_t) updateFlags);
 
   if (repaintRequested || (uint16_t) updateFlags) {
     Serial.println("Repainting");
@@ -182,7 +173,15 @@ void setup() {
     displayPayload.statsH1W = statsCollector.statsHumidity1W();
     displayPayload.statsH1M = statsCollector.statsHumidity1M();
 
-    display.repaint(DisplayController::DrawFlags::CURRENT_READINGS | DisplayController::DrawFlags::GAUGES, &displayPayload);
+    statsCollector.getHistoryChartDataT(displayPayload.historyChartT);
+    statsCollector.getHistoryChartDataH(displayPayload.historyChartH);
+
+    DisplayController::DrawFlags flags = DisplayController::DrawFlags::SD_CARD | DisplayController::DrawFlags::BATTERY | DisplayController::DrawFlags::TIME;
+    if (isFlagSet(updateFlags, UpdateFlags::CURRENT_READING)) flags |= DisplayController::DrawFlags::CURRENT_READINGS | DisplayController::DrawFlags::GAUGES;
+    if (isFlagSet(updateFlags, UpdateFlags::STATS_DAY | UpdateFlags::STATS_WEEK | UpdateFlags::STATS_MONTH)) flags |= DisplayController::DrawFlags::STATISTICS;
+    if (isFlagSet(updateFlags, UpdateFlags::HISTORY_HOUR | UpdateFlags::HISTORY_DAY | UpdateFlags::HISTORY_WEEK | UpdateFlags::HISTORY_MONTH | UpdateFlags::HISTORY_YEAR)) flags |= DisplayController::DrawFlags::HISTORY_GRAPH;
+
+    display.repaint(flags, &displayPayload);
     repaintRequested = false;
   }
 
@@ -199,7 +198,7 @@ void setup() {
   digitalWrite(LED_BUILTIN, HIGH); delay(5);
   digitalWrite(LED_BUILTIN, LOW);  delay(50);
   digitalWrite(LED_BUILTIN, HIGH); delay(5);
-  digitalWrite(LED_BUILTIN, LOW);  delay(50);
+  digitalWrite(LED_BUILTIN, LOW);
 
   // will reset from setup() after wakeup
   auto sleepInterval = MICROSECONDS_PER_MILLISECOND * WAKEUP_INTERVAL_MS;

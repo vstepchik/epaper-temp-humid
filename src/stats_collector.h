@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <AceSorting.h>
 
+#include "HardwareSerial.h"
 #include "common_types.h"
 #include "display_controller.h"
 #include "esp32-hal.h"
@@ -24,12 +25,13 @@ enum class UpdateFlags : uint16_t {
     HISTORY_YEAR     = 1 << 8, // 256
 };
 
-inline UpdateFlags operator|=(UpdateFlags a, UpdateFlags b) {
+inline UpdateFlags operator|(UpdateFlags a, UpdateFlags b) {
   return static_cast<UpdateFlags>(static_cast<uint16_t>(a) | static_cast<uint16_t>(b));
 }
 
-inline UpdateFlags operator|(UpdateFlags a, UpdateFlags b) {
-  return static_cast<UpdateFlags>(static_cast<uint16_t>(a) | static_cast<uint16_t>(b));
+inline UpdateFlags& operator|=(UpdateFlags& a, UpdateFlags b) {
+    a = a | b;
+    return a;
 }
 
 inline UpdateFlags operator&(UpdateFlags a, UpdateFlags b) {
@@ -69,23 +71,20 @@ static inline MeasurementStatistics<float> unpack(MeasurementStatistics<compact_
 }
 
 template<typename T, long S>
-MeasurementStatistics<T> calculateStatistics(RingBuf<T, S>& buffer, long onlyLast = S) {
+MeasurementStatistics<T> calculateStatistics(RingBuf<T, S>& buffer, long onlyOldestNEntries = S) {
     MeasurementStatistics<T> stats = {0, 0, 0, 0};
     if (buffer.isEmpty()) {
         return stats;
     }
 
-    uint16_t bufferSize = (buffer.size() < static_cast<size_t>(onlyLast)) ? buffer.size() : static_cast<size_t>(onlyLast);
+    uint16_t bufferSize = std::min(static_cast<uint16_t>(buffer.size()), static_cast<uint16_t>(onlyOldestNEntries));
     T tempArray[bufferSize];  // Adjusted size for median calculation
     T sum = 0;
     T maxValue = buffer[0];
     T minValue = buffer[0];
 
-    // Calculate start index based on onlyLast
-    uint16_t startIndex = (buffer.size() > onlyLast) ? (buffer.size() - onlyLast) : 0;
-
     // Iterating through the buffer to calculate sum, max, and min
-    for (uint16_t i = startIndex, arrayIndex = 0; i < buffer.size(); ++i, ++arrayIndex) {
+    for (uint16_t i = 0; i < bufferSize; ++i) {
         T currentValue = buffer[i];
         sum += currentValue;
         if (currentValue > maxValue) {
@@ -94,11 +93,13 @@ MeasurementStatistics<T> calculateStatistics(RingBuf<T, S>& buffer, long onlyLas
         if (currentValue < minValue) {
             minValue = currentValue;
         }
-        tempArray[arrayIndex] = currentValue;  // Copying data for median calculation
+        tempArray[i] = currentValue;  // Copying data for median calculation
     }
 
-    // Calculate average
+    // Set avg, max and min
     stats.average = sum / bufferSize;
+    stats.max = maxValue;
+    stats.min = minValue;
 
     // Calculate median
     ace_sorting::shellSortKnuth(tempArray, bufferSize);
@@ -108,11 +109,6 @@ MeasurementStatistics<T> calculateStatistics(RingBuf<T, S>& buffer, long onlyLas
     } else {
         stats.median = (tempArray[middle - 1] + tempArray[middle]) / 2;
     }
-
-    // Set max and min
-    stats.max = maxValue;
-    stats.min = minValue;
-
     return stats;
 }
 
@@ -156,13 +152,12 @@ public:
   UpdateFlags collect(float temperature, float humidity) {
     state.currentReadingBufT.pushOverwrite(pack<compact_t>(temperature));
     state.currentReadingBufH.pushOverwrite(pack<compact_t>(humidity));
-    auto prevTempMedian = state.statsTempCurrent.median;
-    auto prevHumidityMedian = state.statsHumidityCurrent.median;
-    const static auto currentValueMedianSize = 3;
-    state.statsTempCurrent = calculateStatistics<compact_t, CURRENT_READING_MEDIAN_FILTER_SIZE>(state.currentReadingBufT, currentValueMedianSize);
-    state.statsHumidityCurrent = calculateStatistics<compact_t, CURRENT_READING_MEDIAN_FILTER_SIZE>(state.currentReadingBufH, currentValueMedianSize);
+    auto prevTemp = state.statsTempCurrent;
+    auto prevHumidity = state.statsHumidityCurrent;
+    state.statsTempCurrent = state.currentReadingBufT[state.currentReadingBufT.size() - 1];
+    state.statsHumidityCurrent = state.currentReadingBufH[state.currentReadingBufH.size() - 1];
     UpdateFlags updateFlags = UpdateFlags::NONE;
-    if (state.statsTempCurrent.median != prevTempMedian || state.statsHumidityCurrent.median != prevHumidityMedian) {
+    if (state.statsTempCurrent != prevTemp || state.statsHumidityCurrent != prevHumidity) {
       updateFlags |= UpdateFlags::CURRENT_READING;
     }
 
@@ -253,8 +248,8 @@ public:
   }
 
   void currentReadingMedian(float* temp, float* humidity) {
-    *temp = unpack(state.statsTempCurrent.median);
-    *humidity = unpack(state.statsHumidityCurrent.median);
+    *temp = unpack(state.statsTempCurrent);
+    *humidity = unpack(state.statsHumidityCurrent);
   }
 
   MeasurementStatistics<float> statsTemp1D() {
@@ -281,6 +276,34 @@ public:
     return unpack(state.statsHumidity1M);
   }
 
+  void getHistoryChartDataT(float (&values)[CHART_LEN_PX]) {
+    int v = 0, b = state.hourBufT.size();
+    while (b > 0) values[v++] = unpack(state.hourBufT[--b]);
+    b = state.dayBufT.size();
+    while (b > 0) values[v++] = unpack(state.dayBufT[--b]);
+    b = state.weekBufT.size();
+    while (b > 0) values[v++] = unpack(state.weekBufT[--b]);
+    b = state.monthBufT.size();
+    while (b > 0) values[v++] = unpack(state.monthBufT[--b]);
+    b = state.yearBufT.size();
+    while (b > 0) values[v++] = unpack(state.yearBufT[--b]);
+    while (v < CHART_LEN_PX) values[v++] = NAN;
+  }
+
+  void getHistoryChartDataH(float (&values)[CHART_LEN_PX]) {
+    int v = 0, b = state.hourBufH.size();
+    while (b > 0) values[v++] = unpack(state.hourBufH[--b]);
+    b = state.dayBufH.size();
+    while (b > 0) values[v++] = unpack(state.dayBufH[--b]);
+    b = state.weekBufH.size();
+    while (b > 0) values[v++] = unpack(state.weekBufH[--b]);
+    b = state.monthBufH.size();
+    while (b > 0) values[v++] = unpack(state.monthBufH[--b]);
+    b = state.yearBufH.size();
+    while (b > 0) values[v++] = unpack(state.yearBufH[--b]);
+    while (v < CHART_LEN_PX) values[v++] = NAN;
+  }
+
 private:
   struct State {
     time_t lastCollectedAtUnixTimeSec;
@@ -303,11 +326,11 @@ private:
     RingBuf<compact_t, PX_PER_11M> yearBufT;
     RingBuf<compact_t, PX_PER_11M> yearBufH;
 
-    MeasurementStatistics<compact_t> statsTempCurrent;
+    compact_t statsTempCurrent;
     MeasurementStatistics<compact_t> statsTemp1D;
     MeasurementStatistics<compact_t> statsTemp1W;
     MeasurementStatistics<compact_t> statsTemp1M;
-    MeasurementStatistics<compact_t> statsHumidityCurrent;
+    compact_t statsHumidityCurrent;
     MeasurementStatistics<compact_t> statsHumidity1D;
     MeasurementStatistics<compact_t> statsHumidity1W;
     MeasurementStatistics<compact_t> statsHumidity1M;

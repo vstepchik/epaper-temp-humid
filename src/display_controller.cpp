@@ -3,7 +3,7 @@
 #include "display_controller.h"
 #include "esp32-hal.h"
 #include "settings.h"
-#include <cstdint>
+#include <cmath>
 
 static const char y04b = Font_04b03b.yAdvance / 2 + 1;
 
@@ -44,7 +44,10 @@ void DisplayController::repaint(const DrawFlags drawFlags, DisplayRenderPayload*
     unsigned long timestampFullRepaint = micros();
 
     if (isFlagSet(drawFlags, DrawFlags::FULL)) repaintCounter = 0;
-    if (repaintCounter++ % N_UPDATES_BETWEEN_FULL_REPAINTS == 0 || isFlagSet(drawFlags, DrawFlags::FULL)) {
+    bool fullRepaint = repaintCounter++ % N_UPDATES_BETWEEN_FULL_REPAINTS == 0 || isFlagSet(drawFlags, DrawFlags::FULL);
+    Serial.print("Doing repaint, full = ");
+    Serial.println(fullRepaint);
+    if (fullRepaint) {
         display.setFullWindow();
     } else {
         struct Rect { 
@@ -62,7 +65,7 @@ void DisplayController::repaint(const DrawFlags drawFlags, DisplayRenderPayload*
         Rect drawArea = Rect { .x=255, .y=255, .w=0, .h=0 };
         if (isFlagSet(drawFlags, DrawFlags::SD_CARD)) drawArea += Rect { .x=67, .y=0, .w=72, .h=5 }; // (0, 0, 256, 5)
         if (isFlagSet(drawFlags, DrawFlags::BATTERY)) drawArea += Rect { .x=0, .y=0, .w=36, .h=5 }; // (0, 0, 256, 5)
-        if (isFlagSet(drawFlags, DrawFlags::TIME)) drawArea += Rect { .x=170, .y=0, .w=72, .h=5 }; // (0, 0, 256, 5)
+        if (isFlagSet(drawFlags, DrawFlags::TIME)) drawArea += Rect { .x=170, .y=0, .w=78, .h=5 }; // (0, 0, 256, 5)
         if (isFlagSet(drawFlags, DrawFlags::GAUGES)) drawArea += Rect { .x=0, .y=13, .w=105, .h=51 }; // (0, 13, 105, 51)
         if (isFlagSet(drawFlags, DrawFlags::CURRENT_READINGS)) drawArea += Rect { .x=106, .y=11, .w=34, .h=56 }; // (106, 11, 34, 56)
         if (isFlagSet(drawFlags, DrawFlags::STATISTICS)) drawArea += Rect { .x=143, .y=13, .w=107, .h=43 }; // (143, 13, 107, 43)
@@ -105,7 +108,6 @@ void DisplayController::drawGauges(
     const float tempArrX = constrain((currentTempConverted - minTemp) / (maxTemp - minTemp) * 100.0, 1, 99);
     const float humArrX = constrain((currentHumidity - minHum) / (maxHum - minHum) * 100.0, 1, 99);
 
-    unsigned long timestamp = micros();
     // gauges - labels
     display.setFont(&Font_04b03b);
     float tempValues[3] = {
@@ -143,8 +145,6 @@ void DisplayController::drawGauges(
     display.fillRect(0, 37, 2, 16, GxEPD_WHITE); display.drawFastVLine(2, 37, 16, GxEPD_BLACK);
     display.fillRect(103, 19, 2, 16, GxEPD_WHITE); display.drawFastVLine(102, 19, 16, GxEPD_BLACK);
     display.fillRect(103, 37, 2, 16, GxEPD_WHITE); display.drawFastVLine(102, 37, 16, GxEPD_BLACK);
-    Serial.print("Repaint - gauges: ");
-    Serial.println(micros() - timestamp);
 }
 
 void DisplayController::drawStatusBar(DisplayRenderPayload* data) {
@@ -163,26 +163,18 @@ void DisplayController::drawStatusBar(DisplayRenderPayload* data) {
         snprintf(buf, sizeof(buf), "[N/A]");
     }
     display.getTextBounds(buf, 0, 0, &tbx, &tby, &tbw, &tbh);
-
-    unsigned long timestamp = micros();
     display.setCursor(72, y04b);
     display.print(buf);
-    Serial.print("Repaint - sd card: ");
-    Serial.println(micros() - timestamp);
 
     // time
     strftime(buf, sizeof(buf), "%Y-%m-%d - %H:%M", &data->timeinfo);
     display.getTextBounds(buf, 0, 0, &tbx, &tby, &tbw, &tbh);
-    timestamp = micros();
     display.setCursor(170, y04b);
     display.print(buf);
-    Serial.print("Repaint - time: ");
-    Serial.println(micros() - timestamp);
 
     // battery - picture
     const uint8_t batX = 0;
     const uint8_t batY = 0;
-    timestamp = micros();
     display.drawInvertedBitmap(batX, batY, bmp_bat_full, 14, 5, GxEPD_BLACK);
     int8_t bat_pixels_empty = (1.0 - data->batteryLevel) * 11;
     display.fillRect(batX+12-bat_pixels_empty, batY+1, bat_pixels_empty, 3, GxEPD_WHITE);
@@ -191,8 +183,6 @@ void DisplayController::drawStatusBar(DisplayRenderPayload* data) {
     display.setCursor(batX+16, batY+y04b);
     snprintf(buf, sizeof(buf), "%.0f%%", data->batteryLevel * (float)100);
     display.print(buf);
-    Serial.print("Repaint - battery: ");
-    Serial.println(micros() - timestamp);
 }
 
 void DisplayController::drawAllStats(DisplayRenderPayload* data) {
@@ -262,7 +252,6 @@ void DisplayController::drawStats(unsigned char x, unsigned char y, MeasurementS
 void DisplayController::drawCurrentReadings(DisplayRenderPayload* data, const float currentTemp, const char unitSymbol) {
     int16_t tbx, tby; uint16_t tbw, tbh;
     char buf[5];
-    unsigned long timestamp = micros();
     // current values
     display.setFont(&big_digits);
     snprintf(buf, sizeof(buf), "%.1f", currentTemp);
@@ -304,9 +293,6 @@ void DisplayController::drawCurrentReadings(DisplayRenderPayload* data, const fl
         default:
             break;
     };
-
-    Serial.print("Repaint - current values: ");
-    Serial.println(micros() - timestamp);
 }
 
 void DisplayController::drawHistoryGraph(DisplayRenderPayload* data, const char unitSymbol) {
@@ -385,12 +371,16 @@ void DisplayController::drawHistoryGraph(DisplayRenderPayload* data, const char 
     display.setCursor(236, 118);
     display.print(buf);
     // graph - values
-    for (uint8_t i = 0; i < 112; i++) {
-        uint8_t val = sin((float) i / 20) * 5.0 + 11;
-        display.drawFastVLine(i + 121, 86 - val, val, GxEPD_BLACK);
+    for (uint8_t i = 0; i < CHART_LEN_PX && !isnan(data->historyChartT[i]); i++) {
+        // temperature
+        uint8_t val = 20 * (data->historyChartT[i] - data->chartYAxisLowTempCelsiusBound) / (data->chartYAxisHighTempCelsiusBound - data->chartYAxisLowTempCelsiusBound);
+        val = constrain(val, 0, 20);
+        display.drawFastVLine(CHART_LEN_PX - i + 3, 87 - val, val, GxEPD_BLACK);
 
-        val = cos((float) i / 20) * 4.0 + 9;
-        display.drawFastVLine(i + 121, 114 - val, val, GxEPD_BLACK);
+        // humidity
+        val = 20 * (data->historyChartH[i] - data->chartYAxisLowHumidityBound) / (data->chartYAxisHighHumidityBound - data->chartYAxisLowHumidityBound);
+        val = constrain(val, 0, 20);
+        display.drawFastVLine(CHART_LEN_PX - i + 3, 115 - val, val, GxEPD_BLACK);
     }
     Serial.print("Repaint - graph values: ");
     Serial.println(micros() - timestamp);

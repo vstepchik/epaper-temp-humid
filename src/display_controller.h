@@ -57,6 +57,11 @@ inline DisplayController::DrawFlags operator|(DisplayController::DrawFlags a, Di
   return static_cast<DisplayController::DrawFlags>(static_cast<uint16_t>(a) | static_cast<uint16_t>(b));
 }
 
+inline DisplayController::DrawFlags& operator|=(DisplayController::DrawFlags& a, DisplayController::DrawFlags b) {
+    a = a | b;
+    return a;
+}
+
 inline DisplayController::DrawFlags operator&(DisplayController::DrawFlags a, DisplayController::DrawFlags b) {
   return static_cast<DisplayController::DrawFlags>(static_cast<uint16_t>(a) & static_cast<uint16_t>(b));
 }
