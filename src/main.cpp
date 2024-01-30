@@ -4,7 +4,7 @@
 #include <Adafruit_Si7021.h>
 #include <WiFi.h>
 #include "esp_attr.h"
-#include "esp_heap_caps.h"
+#include <MorseCodeMachine.h>
 
 #include "GxEPD2.h"
 #include "fnt_04b03b.h"
@@ -24,6 +24,8 @@ RTC_DATA_ATTR bool repaintRequested = true;
 RTC_DATA_ATTR bool timeSynced = false;
 RTC_DATA_ATTR struct tm timeinfo;
 RTC_DATA_ATTR uint32_t wakeupCounter = 0;
+RTC_DATA_ATTR time_t lastRunAt = 0;
+RTC_DATA_ATTR int32_t secondsUntilNextSoundAlarm = 0;
 
 static Adafruit_Si7021 sensor = Adafruit_Si7021();
 static RTC_DATA_ATTR DisplayController display(initial);
@@ -101,9 +103,35 @@ bool syncTime() {
   return true;
 }
 
+void delayMorse() {
+  delay(BUZZ_LENGTH_MS);
+}
+
+void dotMorse() {
+  tone(BUZZER_PIN, BUZZ_PITCH_HZ);
+  delayMorse();
+  noTone(BUZZER_PIN);
+}
+
+void dashMorse() {
+  tone(BUZZER_PIN, BUZZ_PITCH_HZ);
+  delayMorse();
+  delayMorse();
+  delayMorse();
+  noTone(BUZZER_PIN);
+}
+
+void makeAlertSound(const char msg[]) {
+  gpio_hold_dis(BUZZER_PIN);
+  sendMorse(msg, delayMorse, dotMorse, dashMorse);
+  gpio_hold_en(BUZZER_PIN);
+}
+
 void setup() {
-  pinMode(LED_BUILTIN, OUTPUT);
   pinMode(ONBOARD_BUTTON_PIN, INPUT_PULLUP);
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+
   unsigned long wakeupTime = micros();
 
   Serial.begin(115200);
@@ -121,8 +149,6 @@ void setup() {
   if (wasClick) {
     repaintRequested = true;
   }
-  Serial.print("Repaint requested: ");
-  Serial.println(repaintRequested);
   // Blink once for wakeup
   digitalWrite(LED_BUILTIN, HIGH);
   delay(20);
@@ -135,11 +161,15 @@ void setup() {
     timeSynced = syncTime();
   }
   if(!getLocalTime(&timeinfo)) {
-    Serial.println("Failed to get time :(");
     snprintf(buf, sizeof(buf), "Failed to get time :(");
     display.debug_print(buf);
     return;
   }
+
+  time_t now;
+  time(&now);
+  time_t elapsedTimeSec = now - lastRunAt;
+  lastRunAt = now;
 
   if (sensor.begin()) {
     sensor.heater(false);
@@ -150,8 +180,6 @@ void setup() {
   }
   
   UpdateFlags updateFlags = statsCollector.collect(sensor.readTemperature(), sensor.readHumidity());
-  Serial.print("updateFlags: ");
-  Serial.println((uint16_t) updateFlags);
 
   if (repaintRequested || (uint16_t) updateFlags) {
     Serial.println("Repainting");
@@ -185,6 +213,20 @@ void setup() {
     repaintRequested = false;
   }
 
+  secondsUntilNextSoundAlarm = max((time_t) 0, secondsUntilNextSoundAlarm - elapsedTimeSec);
+  if (secondsUntilNextSoundAlarm <= 0) {
+    secondsUntilNextSoundAlarm = ALARM_INTERVAL_SEC;
+    if (displayPayload.humidityAlert == ALERT_DANGER) {
+      makeAlertSound("HUM");
+    }
+    if (displayPayload.temperatureAlert == ALERT_DANGER) {
+      makeAlertSound("TMP");
+    }
+    if (displayPayload.batteryLevel <= 0.1) {
+      makeAlertSound("BAT");
+    }
+  }
+
   statsCollector.printDebug();
 
   Serial.print("Going to bed.. (total wakeup time ");
@@ -193,7 +235,6 @@ void setup() {
   Serial.flush();
   initial = false;
 
-
   // blink before sleep
   digitalWrite(LED_BUILTIN, HIGH); delay(5);
   digitalWrite(LED_BUILTIN, LOW);  delay(50);
@@ -201,9 +242,16 @@ void setup() {
   digitalWrite(LED_BUILTIN, LOW);
 
   // will reset from setup() after wakeup
+  digitalWrite(BUZZER_PIN, LOW);
+  gpio_hold_en(BUZZER_PIN);
+  gpio_deep_sleep_hold_en(); // make sure the buzzer pin is down during deep sleep
   auto sleepInterval = MICROSECONDS_PER_MILLISECOND * WAKEUP_INTERVAL_MS;
   esp_deep_sleep(constrain(sleepInterval - wakeupTime, MICROSECONDS_PER_MILLISECOND * 100, sleepInterval));
 }
 
 void loop() {
+  digitalWrite(BUZZER_PIN, LOW);
+  gpio_hold_en(BUZZER_PIN);
+  gpio_deep_sleep_hold_en(); // make sure the buzzer pin is down during deep sleep
+  esp_deep_sleep(10000); // reset in 10s in case of setup returned before reaching end
 }
