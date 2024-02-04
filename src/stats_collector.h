@@ -190,7 +190,7 @@ public:
     if (state.timeSinceLastWeekBufPush >= weekBufPushInterval) {
       state.timeSinceLastWeekBufPush -= weekBufPushInterval;
       state.weekBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_23H>(state.dayBufT, 4*60/30).median);
-      state.weekBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_23H>(state.dayBufT, 4*60/30).median);
+      state.weekBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_23H>(state.dayBufH, 4*60/30).median);
       updateFlags |= UpdateFlags::HISTORY_WEEK;
     }
 
@@ -347,9 +347,7 @@ private:
       monthBufT(initHelper),
       monthBufH(initHelper),
       yearBufT(initHelper),
-      yearBufH(initHelper) {
-        // Constructor body, if needed
-    }
+      yearBufH(initHelper) {}
   };
 
   State state;

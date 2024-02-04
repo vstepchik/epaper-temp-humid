@@ -83,6 +83,8 @@ inline bool setupInterrupts() {
 }
 
 bool syncTime() {
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   uint8_t attempts = WIFI_CONNECT_ATTEMPTS;
   while (WiFi.status() != WL_CONNECTED) {
@@ -90,6 +92,7 @@ bool syncTime() {
     if (attempts == 0) {
       return false;
     }
+    yield();
     delay(WIFI_CONNECT_ATTEMPT_INTERVAL_MS - 40);
     digitalWrite(LED_BUILTIN, HIGH);
     delay(40);
@@ -135,7 +138,7 @@ void setup() {
   unsigned long wakeupTime = micros();
 
   Serial.begin(115200);
-  Serial.print("Wakeup!!!!!! #");
+  Serial.print(F("Wakeup!!!!!! #"));
   Serial.println(++wakeupCounter);
 
   wasClick = false;
@@ -144,7 +147,7 @@ void setup() {
       digitalWrite(LED_BUILTIN, HIGH); delay(200);
       digitalWrite(LED_BUILTIN, LOW);  delay(50);
   }
-  Serial.print("Was click: ");
+  Serial.print(F("Was click: "));
   Serial.println(wasClick);
   if (wasClick) {
     repaintRequested = true;
@@ -155,7 +158,7 @@ void setup() {
   digitalWrite(LED_BUILTIN, LOW);
 
   if (!setupInterrupts()) return;
-  Serial.println("Interrupts set.");
+  Serial.println(F("Interrupts set."));
 
   if (!timeSynced) {
     timeSynced = syncTime();
