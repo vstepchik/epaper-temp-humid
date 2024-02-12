@@ -9,7 +9,7 @@ static const char y04b = Font_04b03b.yAdvance / 2 + 1;
 
 DisplayController::DisplayController(bool initial) : display(GxEPD2_213_B74(5, 17, 16, 4)) {
     display.init(0, initial);
-    display.setRotation(3);
+    display.setRotation(1);
     display.setFullWindow();
     display.setTextColor(GxEPD_BLACK);
     display.setTextWrap(false);
