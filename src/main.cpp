@@ -130,7 +130,21 @@ void makeAlertSound(const char msg[]) {
   gpio_hold_en(BUZZER_PIN);
 }
 
+bool setPowerBoostKeepOn(int en)
+{
+#define IP5306_ADDR                     0X75
+#define IP5306_REG_SYS_CTL0             0x00
+    Wire.beginTransmission(IP5306_ADDR);
+    Wire.write(IP5306_REG_SYS_CTL0);
+    if (en)
+        Wire.write(0x37); // Set bit1: 1 enable 0 disable boost keep on
+    else
+        Wire.write(0x35); // 0x37 is default reg value
+    return Wire.endTransmission() == 0;
+}
+
 void setup() {
+  setPowerBoostKeepOn(false);
   pinMode(ONBOARD_BUTTON_PIN, INPUT_PULLUP);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
@@ -179,7 +193,7 @@ void setup() {
   } else {
     snprintf(buf, sizeof(buf), "Sensor no begin :(");
     display.debug_print(buf);
-    return;
+    //return;
   }
   
   UpdateFlags updateFlags = statsCollector.collect(sensor.readTemperature(), sensor.readHumidity());
@@ -212,6 +226,7 @@ void setup() {
     if (isFlagSet(updateFlags, UpdateFlags::STATS_DAY | UpdateFlags::STATS_WEEK | UpdateFlags::STATS_MONTH)) flags |= DisplayController::DrawFlags::STATISTICS;
     if (isFlagSet(updateFlags, UpdateFlags::HISTORY_HOUR | UpdateFlags::HISTORY_DAY | UpdateFlags::HISTORY_WEEK | UpdateFlags::HISTORY_MONTH | UpdateFlags::HISTORY_YEAR)) flags |= DisplayController::DrawFlags::HISTORY_GRAPH;
 
+    // todo: try lowering frequency here to save power
     display.repaint(flags, &displayPayload);
     repaintRequested = false;
   }

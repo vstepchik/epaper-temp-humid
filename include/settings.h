@@ -38,7 +38,7 @@
 4.15v = 2420
 4.20v = 2450
 */
-#define BATT_FULL 2420 // value at 4.15V
+#define BATT_FULL 2330 // value at 4.00V
 
 
 #define PX_PER_1H 30
