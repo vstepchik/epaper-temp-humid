@@ -7,7 +7,6 @@
 
 #include "HardwareSerial.h"
 #include "common_types.h"
-#include "display_controller.h"
 #include "esp32-hal.h"
 #include "settings.h"
 
@@ -144,6 +143,9 @@ public:
     printDebug<PX_PER_11M>("yearBufT", state.yearBufT);
     printDebug<PX_PER_11M>("yearBufH", state.yearBufH);
 
+    Serial.println("---");
+    Serial.print("Tday:  "); Serial.print("A="); Serial.print("M="); Serial.print("^="); Serial.println("v=");
+
     time = micros() - time;
     Serial.print("StatsCollector::printDebug took "); Serial.print(time); Serial.println(" microseconds.");
     Serial.println("==== End Stats Collector Debug Info ====");
@@ -197,7 +199,7 @@ public:
     if (state.timeSinceLastMonthBufPush >= monthBufPushInterval) {
       state.timeSinceLastMonthBufPush -= monthBufPushInterval;
       state.monthBufT.pushOverwrite(calculateStatistics<compact_t, PX_PER_6D>(state.weekBufT, 8/4).median);
-      state.monthBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_6D>(state.weekBufH).median);
+      state.monthBufH.pushOverwrite(calculateStatistics<compact_t, PX_PER_6D>(state.weekBufH, 8/4).median);
       updateFlags |= UpdateFlags::HISTORY_MONTH;
     }
 

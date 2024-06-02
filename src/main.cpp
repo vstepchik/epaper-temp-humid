@@ -6,9 +6,6 @@
 #include "esp_attr.h"
 #include <MorseCodeMachine.h>
 
-#include "GxEPD2.h"
-#include "fnt_04b03b.h"
-#include "fnt_big_digits.h"
 #include "time.h"
 #include "display_controller.h"
 #include "common_types.h"
@@ -130,21 +127,7 @@ void makeAlertSound(const char msg[]) {
   gpio_hold_en(BUZZER_PIN);
 }
 
-bool setPowerBoostKeepOn(int en)
-{
-#define IP5306_ADDR                     0X75
-#define IP5306_REG_SYS_CTL0             0x00
-    Wire.beginTransmission(IP5306_ADDR);
-    Wire.write(IP5306_REG_SYS_CTL0);
-    if (en)
-        Wire.write(0x37); // Set bit1: 1 enable 0 disable boost keep on
-    else
-        Wire.write(0x35); // 0x37 is default reg value
-    return Wire.endTransmission() == 0;
-}
-
 void setup() {
-  setPowerBoostKeepOn(false);
   pinMode(ONBOARD_BUTTON_PIN, INPUT_PULLUP);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BUZZER_PIN, OUTPUT);
