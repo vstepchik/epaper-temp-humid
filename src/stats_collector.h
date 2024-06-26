@@ -78,7 +78,7 @@ MeasurementStatistics<T> calculateStatistics(RingBuf<T, S>& buffer, long onlyOld
 
     uint16_t bufferSize = std::min(static_cast<uint16_t>(buffer.size()), static_cast<uint16_t>(onlyOldestNEntries));
     T tempArray[bufferSize];  // Adjusted size for median calculation
-    T sum = 0;
+    long sum = 0;
     T maxValue = buffer[0];
     T minValue = buffer[0];
 

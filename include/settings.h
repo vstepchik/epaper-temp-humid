@@ -67,6 +67,7 @@
 #define ALARM_INTERVAL_SEC 2*60*60 // 2h
 #define BUZZ_LENGTH_MS 100
 #define BUZZ_PITCH_HZ 4000 // ~3700-4000 resonance
+#define ALERT_BAT_LOW 0.15
 
 
 // Computed

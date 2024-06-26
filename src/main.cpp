@@ -223,7 +223,7 @@ void setup() {
     if (displayPayload.temperatureAlert == ALERT_DANGER) {
       makeAlertSound("TMP");
     }
-    if (displayPayload.batteryLevel <= 0.1) {
+    if (displayPayload.batteryLevel <= ALERT_BAT_LOW) {
       makeAlertSound("BAT");
     }
   }
