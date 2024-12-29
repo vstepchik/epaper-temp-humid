@@ -4,3 +4,5 @@
 
 credentials.h
 *.FCBak
+
+compile_commands.json
