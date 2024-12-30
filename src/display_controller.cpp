@@ -167,7 +167,8 @@ void DisplayController::drawStatusBar(DisplayRenderPayload* data) {
     display.print(buf);
 
     // time
-    strftime(buf, sizeof(buf), "%Y-%m-%d - %H:%M", &data->timeinfo);
+    snprintf(buf, sizeof(buf), "YYYY-MM-DD - hh:mm:ss");
+    data->timeinfo.toString(buf);
     display.getTextBounds(buf, 0, 0, &tbx, &tby, &tbw, &tbh);
     display.setCursor(170, y04b);
     display.print(buf);

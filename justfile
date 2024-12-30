@@ -4,7 +4,7 @@ default:
 
 # Build the project
 build:
-    pio run -t build
+    pio run
 
 # Clean the project
 clean:
@@ -34,11 +34,11 @@ pkg-search query:
 
 # Install a specific library
 pkg-install library:
-    pio pkg install "{{library}}"
+    pio pkg install -l "{{library}}"
 
 # Uninstall a specific library
 pkg-uninstall library:
-    pio pkg uninstall "{{library}}"
+    pio pkg uninstall -l "{{library}}"
 
 # List installed packages
 pkg-list:

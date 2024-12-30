@@ -13,7 +13,7 @@
 #include "credentials.h"
 #include "settings.h"
 #include "stats_collector.h"
-
+#include "RTClib.h"
 
 // RUNTIME STATE
 RTC_DATA_ATTR bool initial = true;
@@ -21,12 +21,12 @@ RTC_DATA_ATTR bool repaintRequested = true;
 RTC_DATA_ATTR bool timeSynced = false;
 RTC_DATA_ATTR struct tm timeinfo;
 RTC_DATA_ATTR uint32_t wakeupCounter = 0;
-RTC_DATA_ATTR time_t lastRunAt = 0;
-RTC_DATA_ATTR int32_t secondsUntilNextSoundAlarm = 0;
+RTC_DATA_ATTR DateTime lastAlarmAt;
 
 static Adafruit_Si7021 sensor = Adafruit_Si7021();
 static RTC_DATA_ATTR DisplayController display(initial);
 static RTC_DATA_ATTR StatsCollector<uint16_t> statsCollector(initial);
+static RTC_DS3231 rtc;
 
 
 bool wasClick = false;
@@ -137,6 +137,10 @@ void setup() {
   Serial.begin(115200);
   Serial.print(F("Wakeup!!!!!! #"));
   Serial.println(++wakeupCounter);
+  Serial.print("compiled: ");
+  Serial.print(__DATE__);
+  Serial.print(" ");
+  Serial.println(__TIME__);
 
   wasClick = false;
   if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
@@ -157,26 +161,53 @@ void setup() {
   if (!setupInterrupts()) return;
   Serial.println(F("Interrupts set."));
 
-  if (!timeSynced) {
-    timeSynced = syncTime();
+  // ### TIME
+  if (!rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
   }
-  if(!getLocalTime(&timeinfo)) {
-    snprintf(buf, sizeof(buf), "Failed to get time :(");
-    display.debug_print(buf);
-    return;
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, let's set the time!");
+    if (!timeSynced) {
+      timeSynced = syncTime();
+    }
+    if(!getLocalTime(&timeinfo)) {
+      snprintf(buf, sizeof(buf), "Failed to get time :(");
+      display.debug_print(buf);
+      return;
+    }
+
+    // When time needs to be set on a new device, or after a power loss, the
+    // following line sets the RTC to the date & time this sketch was compiled
+    rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+    // This line sets the RTC with an explicit date & time, for example to set
+    // January 21, 2014 at 3am you would call:
+    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
+  DateTime dt_now = rtc.now();
+  Serial.print("\nRTC Time: ");
+  Serial.print(dt_now.year(), DEC);
+  Serial.print('/');
+  Serial.print(dt_now.month(), DEC);
+  Serial.print('/');
+  Serial.print(dt_now.day(), DEC);
+  Serial.print(' ');
+  Serial.print(dt_now.hour(), DEC);
+  Serial.print(':');
+  Serial.print(dt_now.minute(), DEC);
+  Serial.print(':');
+  Serial.print(dt_now.second(), DEC);
+  Serial.println();
+  Serial.print("RTC Temperature: ");
+  Serial.print(rtc.getTemperature());
+  Serial.println(" C\n");
 
-  time_t now;
-  time(&now);
-  time_t elapsedTimeSec = now - lastRunAt;
-  lastRunAt = now;
-
+  // ### SENSOR
   if (sensor.begin()) {
     sensor.heater(false);
   } else {
     snprintf(buf, sizeof(buf), "Sensor no begin :(");
     display.debug_print(buf);
-    //return;
   }
   
   UpdateFlags updateFlags = statsCollector.collect(sensor.readTemperature(), sensor.readHumidity());
@@ -187,7 +218,7 @@ void setup() {
     statsCollector.currentReadingMedian(&t, &h);
 
     displayPayload.degreesUnit = CELSIUS;
-    displayPayload.timeinfo = timeinfo;
+    displayPayload.timeinfo = dt_now;
     displayPayload.currentTemperatureCelsius = t;
     displayPayload.temperatureAlert = calcTemperatureAlert(displayPayload.currentTemperatureCelsius);
     displayPayload.currentHumidity = h;
@@ -214,9 +245,8 @@ void setup() {
     repaintRequested = false;
   }
 
-  secondsUntilNextSoundAlarm = max((time_t) 0, secondsUntilNextSoundAlarm - elapsedTimeSec);
-  if (secondsUntilNextSoundAlarm <= 0) {
-    secondsUntilNextSoundAlarm = ALARM_INTERVAL_SEC;
+  if (lastAlarmAt + TimeSpan(ALARM_INTERVAL_SEC) >= dt_now) {
+    lastAlarmAt = dt_now;
     if (displayPayload.humidityAlert == ALERT_DANGER) {
       makeAlertSound("HUM");
     }
@@ -228,7 +258,7 @@ void setup() {
     }
   }
 
-  statsCollector.printDebug();
+  // statsCollector.printDebug();
 
   Serial.print("Going to bed.. (total wakeup time ");
   Serial.print(micros() - wakeupTime);

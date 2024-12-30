@@ -143,9 +143,6 @@ public:
     printDebug<PX_PER_11M>("yearBufT", state.yearBufT);
     printDebug<PX_PER_11M>("yearBufH", state.yearBufH);
 
-    Serial.println("---");
-    Serial.print("Tday:  "); Serial.print("A="); Serial.print("M="); Serial.print("^="); Serial.println("v=");
-
     time = micros() - time;
     Serial.print("StatsCollector::printDebug took "); Serial.print(time); Serial.println(" microseconds.");
     Serial.println("==== End Stats Collector Debug Info ====");
