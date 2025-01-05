@@ -167,7 +167,7 @@ void DisplayController::drawStatusBar(DisplayRenderPayload* data) {
     display.print(buf);
 
     // time
-    snprintf(buf, sizeof(buf), "YYYY-MM-DD - hh:mm:ss");
+    snprintf(buf, sizeof(buf), "YYYY-MM-DD - hh:mm");
     data->timeinfo.toString(buf);
     display.getTextBounds(buf, 0, 0, &tbx, &tby, &tbw, &tbh);
     display.setCursor(170, y04b);
@@ -215,12 +215,12 @@ void DisplayController::drawAllStats(DisplayRenderPayload* data) {
     display.print(data->degreesUnit == CELSIUS ? 'C' : 'F');
     display.setCursor(statX+5, statY+33 + y04b);
     display.print(F("H"));
-    display.setCursor(statX+20, statY+7 + y04b);
-    display.print(F("DAY"));
-    display.setCursor(statX+48, statY+7 + y04b);
-    display.print(F("WEEK"));
-    display.setCursor(statX+78, statY+7 + y04b);
-    display.print(F("MONTH"));
+    display.setCursor(statX+22, statY+7 + y04b);
+    display.print(F("24h"));
+    display.setCursor(statX+54, statY+7 + y04b);
+    display.print(F("7d"));
+    display.setCursor(statX+84, statY+7 + y04b);
+    display.print(F("30d"));
 
     // statistics - individual values
     display.setFont(&TomThumb);

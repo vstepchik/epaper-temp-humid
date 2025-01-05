@@ -21,7 +21,7 @@ RTC_DATA_ATTR bool repaintRequested = true;
 RTC_DATA_ATTR bool timeSynced = false;
 RTC_DATA_ATTR struct tm timeinfo;
 RTC_DATA_ATTR uint32_t wakeupCounter = 0;
-RTC_DATA_ATTR DateTime lastAlarmAt;
+RTC_DATA_ATTR uint64_t lastAlarmAtSec = 0;
 
 static Adafruit_Si7021 sensor = Adafruit_Si7021();
 static RTC_DATA_ATTR DisplayController display(initial);
@@ -245,8 +245,10 @@ void setup() {
     repaintRequested = false;
   }
 
-  if (lastAlarmAt + TimeSpan(ALARM_INTERVAL_SEC) >= dt_now) {
-    lastAlarmAt = dt_now;
+  DateTime lastAlarmAt = DateTime(SECONDS_FROM_1970_TO_2000 + lastAlarmAtSec);
+  if ((dt_now - lastAlarmAt).totalseconds() >= ALARM_INTERVAL_SEC) {
+    Serial.println("beep?");
+    lastAlarmAtSec = dt_now.secondstime();
     if (displayPayload.humidityAlert == ALERT_DANGER) {
       makeAlertSound("HUM");
     }
