@@ -52,23 +52,23 @@
 // Settings
 #define WIFI_CONNECT_ATTEMPTS 20
 #define WIFI_CONNECT_ATTEMPT_INTERVAL_MS 250 // should be > 50
-#define SYNC_TIME_OVER_WIFI_EVERY_MINUTES 60*8
 #define NTP_SERVER_0 "pool.ntp.org"
 #define NTP_SERVER_1 "time.google.com"
 #define NTP_SERVER_2 "time.cloudflare.com"
 #define GMT_OFFSET_SEC 3600
 #define DAYLIGHT_OFFSET_SEC 3600
 
+#define BLINK_LED false
 #define WAKEUP_INTERVAL_MS 12000 // energy drain <--> timekeeping accuracy tradeoff
-#define SENSOR_READ_INTERVAL_SEC 12 // 10 reads/2min
+#define SENSOR_READ_INTERVAL_SEC 30 // 2 read/min
 #define CURRENT_READING_MEDIAN_FILTER_SIZE 60/PX_PER_1H*60/SENSOR_READ_INTERVAL_SEC
-#define N_UPDATES_BETWEEN_FULL_REPAINTS 10
+#define N_UPDATES_BETWEEN_FULL_REPAINTS 20
 
-#define ALARM_INTERVAL_SEC 2*60*60 // 2h
+#define ALARM_INTERVAL_SEC 3*60*60+5 // 3h5s for small drift
 #define BUZZ_LENGTH_MS 100
 #define BUZZ_PITCH_HZ 4000 // ~3700-4000 resonance
 #define ALERT_BAT_LOW 0.15
 
 
 // Computed
-#define READS_BUFFER_SIZE MIN_PER_HOUR/PX_PER_1H*SEC_PER_MIN/SENSOR_READ_INTERVAL_SEC // 10 reads buffer
+#define READS_BUFFER_SIZE MIN_PER_HOUR/PX_PER_1H*SEC_PER_MIN/SENSOR_READ_INTERVAL_SEC // 4 reads buffer

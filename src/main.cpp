@@ -22,6 +22,7 @@ RTC_DATA_ATTR bool timeSynced = false;
 RTC_DATA_ATTR struct tm timeinfo;
 RTC_DATA_ATTR uint32_t wakeupCounter = 0;
 RTC_DATA_ATTR uint64_t lastAlarmAtSec = 0;
+RTC_DATA_ATTR uint64_t lastSensorReadoutAtSec = 0;
 
 static Adafruit_Si7021 sensor = Adafruit_Si7021();
 static RTC_DATA_ATTR DisplayController display(initial);
@@ -91,9 +92,11 @@ bool syncTime() {
     }
     yield();
     delay(WIFI_CONNECT_ATTEMPT_INTERVAL_MS - 40);
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(40);
-    digitalWrite(LED_BUILTIN, LOW);
+    if (BLINK_LED) {
+      digitalWrite(LED_BUILTIN, HIGH);
+      delay(40);
+      digitalWrite(LED_BUILTIN, LOW);
+    }
   }
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER_0, NTP_SERVER_1, NTP_SERVER_2);
   delay(500);
@@ -127,6 +130,22 @@ void makeAlertSound(const char msg[]) {
   gpio_hold_en(BUZZER_PIN);
 }
 
+void gracefulSleep(const unsigned long wakeupTimeMicroseconds) {
+  Serial.println("..setting buzzer pin low");
+  digitalWrite(BUZZER_PIN, LOW);
+  gpio_hold_en(BUZZER_PIN);
+  gpio_deep_sleep_hold_en(); // make sure the buzzer pin is down during deep sleep
+  Serial.println("..computing sleep time");
+  auto sleepInterval = MICROSECONDS_PER_MILLISECOND * WAKEUP_INTERVAL_MS;
+  // subtract time spent turned on to keep interval and not delay between wakeups
+  auto wakeupAfterMicroseconds = constrain(sleepInterval - wakeupTimeMicroseconds, MICROSECONDS_PER_MILLISECOND * 100, sleepInterval);
+  Serial.println("(now really sleep)\n\n\n\n");
+  Serial.flush();
+  delay(1); // without this the program is reset by watchdog during sleep for some reason - couldn't figure out why
+  esp_deep_sleep(wakeupAfterMicroseconds); 
+  Serial.println("Eh? Should not happen!");
+}
+
 void setup() {
   pinMode(ONBOARD_BUTTON_PIN, INPUT_PULLUP);
   pinMode(LED_BUILTIN, OUTPUT);
@@ -137,16 +156,18 @@ void setup() {
   Serial.begin(115200);
   Serial.print(F("Wakeup!!!!!! #"));
   Serial.println(++wakeupCounter);
-  Serial.print("compiled: ");
+  Serial.print(F("compiled: "));
   Serial.print(__DATE__);
-  Serial.print(" ");
+  Serial.print(F(" "));
   Serial.println(__TIME__);
 
   wasClick = false;
   if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) {
       wasClick = true; 
-      digitalWrite(LED_BUILTIN, HIGH); delay(200);
-      digitalWrite(LED_BUILTIN, LOW);  delay(50);
+      if (BLINK_LED) {
+        digitalWrite(LED_BUILTIN, HIGH); delay(200);
+        digitalWrite(LED_BUILTIN, LOW);  delay(50);
+      }
   }
   Serial.print(F("Was click: "));
   Serial.println(wasClick);
@@ -154,9 +175,11 @@ void setup() {
     repaintRequested = true;
   }
   // Blink once for wakeup
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(20);
-  digitalWrite(LED_BUILTIN, LOW);
+  if (BLINK_LED) {
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(20);
+    digitalWrite(LED_BUILTIN, LOW);
+  }
 
   if (!setupInterrupts()) return;
   Serial.println(F("Interrupts set."));
@@ -203,14 +226,23 @@ void setup() {
   Serial.println(" C\n");
 
   // ### SENSOR
-  if (sensor.begin()) {
-    sensor.heater(false);
+
+  UpdateFlags updateFlags = UpdateFlags::NONE;
+  DateTime lastSensorReadoutAt = DateTime(SECONDS_FROM_1970_TO_2000 + lastSensorReadoutAtSec);
+  if ((dt_now - lastSensorReadoutAt).totalseconds() >= SENSOR_READ_INTERVAL_SEC) {
+    if (sensor.begin()) {
+      Serial.println("Reading sensor...");
+      lastSensorReadoutAtSec = dt_now.secondstime();
+      sensor.heater(false); // preserve battery
+      updateFlags = statsCollector.collect(sensor.readTemperature(), sensor.readHumidity());
+    } else {
+      Serial.println("Sensor failure!");
+      snprintf(buf, sizeof(buf), "Sensor no begin :(");
+      display.debug_print(buf);
+    }
   } else {
-    snprintf(buf, sizeof(buf), "Sensor no begin :(");
-    display.debug_print(buf);
+    Serial.println("Sensor - skip");
   }
-  
-  UpdateFlags updateFlags = statsCollector.collect(sensor.readTemperature(), sensor.readHumidity());
 
   if (repaintRequested || (uint16_t) updateFlags) {
     Serial.println("Repainting");
@@ -243,11 +275,13 @@ void setup() {
     // todo: try lowering frequency here to save power
     display.repaint(flags, &displayPayload);
     repaintRequested = false;
+  } else {
+    Serial.println("Repaint - skip");
   }
 
   DateTime lastAlarmAt = DateTime(SECONDS_FROM_1970_TO_2000 + lastAlarmAtSec);
   if ((dt_now - lastAlarmAt).totalseconds() >= ALARM_INTERVAL_SEC) {
-    Serial.println("beep?");
+    Serial.println("Making alarm sound");
     lastAlarmAtSec = dt_now.secondstime();
     if (displayPayload.humidityAlert == ALERT_DANGER) {
       makeAlertSound("HUM");
@@ -258,33 +292,30 @@ void setup() {
     if (displayPayload.batteryLevel <= ALERT_BAT_LOW) {
       makeAlertSound("BAT");
     }
+  } else {
+    Serial.println("Alarm sound - skip");
   }
 
   // statsCollector.printDebug();
 
   Serial.print("Going to bed.. (total wakeup time ");
   Serial.print(micros() - wakeupTime);
-  Serial.println("us) z-z-z-z\n\n");
-  Serial.flush();
+  Serial.println("us) z-z-z-z\n");
+  // Serial.flush();
   initial = false;
 
   // blink before sleep
-  digitalWrite(LED_BUILTIN, HIGH); delay(5);
-  digitalWrite(LED_BUILTIN, LOW);  delay(50);
-  digitalWrite(LED_BUILTIN, HIGH); delay(5);
-  digitalWrite(LED_BUILTIN, LOW);
+  if (BLINK_LED) {
+    digitalWrite(LED_BUILTIN, HIGH); delay(5);
+    digitalWrite(LED_BUILTIN, LOW);  delay(50);
+    digitalWrite(LED_BUILTIN, HIGH); delay(5);
+    digitalWrite(LED_BUILTIN, LOW);
+  }
 
   // will reset from setup() after wakeup
-  digitalWrite(BUZZER_PIN, LOW);
-  gpio_hold_en(BUZZER_PIN);
-  gpio_deep_sleep_hold_en(); // make sure the buzzer pin is down during deep sleep
-  auto sleepInterval = MICROSECONDS_PER_MILLISECOND * WAKEUP_INTERVAL_MS;
-  esp_deep_sleep(constrain(sleepInterval - wakeupTime, MICROSECONDS_PER_MILLISECOND * 100, sleepInterval));
+  gracefulSleep(wakeupTime);
 }
 
 void loop() {
-  digitalWrite(BUZZER_PIN, LOW);
-  gpio_hold_en(BUZZER_PIN);
-  gpio_deep_sleep_hold_en(); // make sure the buzzer pin is down during deep sleep
-  esp_deep_sleep(10000); // reset in 10s in case of setup returned before reaching end
+  gracefulSleep(0);
 }

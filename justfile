@@ -47,3 +47,6 @@ pkg-list:
 # Update installed packages
 pkg-update:
     pio pkg update
+
+trace-pc-address pc_address:
+    addr2line -pfiaC -e ./.pio/build/lilygo-t-display/firmware.elf "{{pc_address}}"
